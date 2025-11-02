@@ -20,7 +20,10 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="Clipboard API service for storing and retrieving clipboard data.",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url=None,  # 禁用 /docs
+    redoc_url=None,  # 禁用 /redoc
+    openapi_url=None  # 禁用 /openapi.json
 )
 
 app.add_middleware(
@@ -35,13 +38,14 @@ app.include_router(routes_auth.router)
 app.include_router(routes_clipboard.router)
 
 
-@app.get("/")
-async def root():
-    return {
-        "message": "Welcome to the Clipboard API!",
-        "version": settings.APP_VERSION,
-        "docs": "/docs"
-    }
+# 如果不需要根路径访问，可以注释掉或删除
+# @app.get("/")
+# async def root():
+#     return {
+#         "message": "Welcome to the Clipboard API!",
+#         "version": settings.APP_VERSION,
+#         "docs": "/docs"
+#     }
 
 
 @app.get("/health")
