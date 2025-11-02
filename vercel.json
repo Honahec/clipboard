@@ -1,17 +1,15 @@
 {
-  "builds": [
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
-    },
-    {
-      "src": "api/*.py",
-      "use": "@vercel/python"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "outputDirectory": "frontend/dist",
+  "buildCommand": "cd frontend && pnpm run build",
+  "installCommand": "pnpm install",
+  "functions": {
+    "api/**/*.py": {
+      "excludeFiles": "{tests/**,__tests__/**,**/*.test.py}"
     }
-  ],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1.py" },
-    { "src": "/(.*)", "dest": "/$1" }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1.py" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
