@@ -1,0 +1,2 @@
+# This file references the backend requirements
+-r ../backend/requirements.txt
