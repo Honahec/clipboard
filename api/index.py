@@ -8,6 +8,8 @@ sys.path.insert(0, backend_path)
 # Import the FastAPI app
 from app.main import app  # noqa: E402
 
+app.root_path = "/api"
+
 # Export the app for Vercel
 # Vercel will use this as the ASGI application
 handler = app
