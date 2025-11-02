@@ -6,13 +6,12 @@
       "config": {
         "distDir": "frontend/dist"
       }
+    },
+    {
+      "src": "api/*.py",
+      "use": "@vercel/python"
     }
   ],
-  "functions": {
-    "api/*.py": {
-      "runtime": "python3.13"
-    }
-  },
   "routes": [
     {
       "src": "/api/(.*)",
