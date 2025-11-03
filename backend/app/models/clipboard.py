@@ -25,6 +25,7 @@ class Clipboard(Base):
     is_encrypted = Column(Boolean, default=False)
     encryption_key = Column(String(255), nullable=True)
     user = Column(String(255), nullable=True)
+    is_public = Column(Boolean, default=True)
 
 
 # Pydantic Schemas
@@ -34,14 +35,20 @@ class ClipboardBase(BaseModel):
     is_encrypted: bool = Field(False, description="whether it is encrypted")
     encryption_key: Optional[str] = Field(None, description="encryption key")
     user: Optional[str] = Field(None, description="associated user")
+    is_public: bool = Field(True, description="whether the clipboard is public")
 
 
 class ClipboardCreate(ClipboardBase):
     pass
 
 
-class ClipboardUpdate(ClipboardBase):
-    pass
+class ClipboardUpdate(BaseModel):
+    content: Optional[str] = Field(None, min_length=1, description="content of the clipboard")
+    expires_at: Optional[datetime] = Field(None, description="expiration time")
+    is_encrypted: Optional[bool] = Field(None, description="whether it is encrypted")
+    encryption_key: Optional[str] = Field(None, description="encryption key")
+    user: Optional[str] = Field(None, description="associated user")
+    is_public: Optional[bool] = Field(None, description="whether the clipboard is public")
 
 
 class ClipboardResponse(ClipboardBase):

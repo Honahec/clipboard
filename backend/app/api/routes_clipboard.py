@@ -59,7 +59,8 @@ async def create_clipboard(
                 expires_at=clipboard_data.expires_at,
                 is_encrypted=clipboard_data.is_encrypted,
                 encryption_key=clipboard_data.encryption_key,
-                user=owner_id
+                user=owner_id,
+                is_public=clipboard_data.is_public
             )
             db.add(db_clipboard)
             db.commit()
@@ -101,11 +102,12 @@ async def read_clipboard(
         )
     
     if db_clipboard.user:
-        if not current_user or db_clipboard.user != current_user.user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Clipboard is private.",
-            )
+        if not db_clipboard.is_public:
+            if not current_user or db_clipboard.user != current_user.user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Clipboard is private.",
+                )
 
     return db_clipboard
 
@@ -121,10 +123,10 @@ async def list_clipboards(
     query = db.query(Clipboard)
     if current_user:
         query = query.filter(
-            or_(Clipboard.user.is_(None), Clipboard.user == current_user.user_id)
+            or_(Clipboard.is_public == True, Clipboard.user == current_user.user_id)
         )
     else:
-        query = query.filter(Clipboard.user.is_(None))
+        query = query.filter(Clipboard.is_public == True)
 
     clipboards = query.offset(skip).limit(limit).all()
     return clipboards
@@ -177,6 +179,17 @@ async def update_clipboard(
             update_data["user"] = current_user.user_id
         else:
             update_data["user"] = None
+
+    # Handle is_public updates
+    if "is_public" in update_data:
+        # Only the owner can change visibility
+        if not db_clipboard.user or (current_user and db_clipboard.user == current_user.user_id):
+            pass  # Allow the update
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the owner can change visibility.",
+            )
 
     for field, value in update_data.items():
         setattr(db_clipboard, field, value)

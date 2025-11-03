@@ -47,6 +47,7 @@ export function ClipboardForm() {
       content: string;
       expires_at: string | null;
       user?: string | null;
+      is_public?: boolean;
     }) => createClipboard(payload, { token }),
     onSuccess: (response) => {
       toast({
@@ -89,6 +90,7 @@ export function ClipboardForm() {
       content: content.trim(),
       expires_at,
       user: isPrivate ? user?.userId ?? null : null,
+      is_public: !isPrivate,
     });
   };
 

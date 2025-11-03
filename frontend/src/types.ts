@@ -9,6 +9,7 @@ export interface ClipboardRecord {
   is_encrypted: boolean;
   encryption_key?: string | null;
   user?: string | null;
+  is_public: boolean;
 }
 
 export interface CreateClipboardPayload {
@@ -17,6 +18,7 @@ export interface CreateClipboardPayload {
   is_encrypted?: boolean;
   encryption_key?: string | null;
   user?: string | null;
+  is_public?: boolean;
 }
 
 export type UpdateClipboardPayload = Partial<CreateClipboardPayload>;

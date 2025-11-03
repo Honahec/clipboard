@@ -43,7 +43,7 @@ function ClipboardCard({
   onToggleVisibility: (clipboard: ClipboardRecord) => void;
   canManage: boolean;
 }) {
-  const isPrivate = Boolean(clipboard.user);
+  const isPrivate = !clipboard.is_public;
   return (
     <Card variant='outline'>
       <CardHeader pb={0}>
@@ -89,7 +89,7 @@ function ClipboardCard({
                 variant='outline'
                 onClick={() => onToggleVisibility(clipboard)}
               >
-                {clipboard.user ? '设为公开' : '设为仅本人可见'}
+                {clipboard.is_public ? '设为仅本人可见' : '设为公开'}
               </Button>
               <IconButton
                 size='sm'
@@ -149,7 +149,7 @@ export function ClipboardList() {
     mutationFn: (clipboard: ClipboardRecord) =>
       updateClipboard(
         clipboard.clipboard_id,
-        { user: clipboard.user ? null : user?.userId ?? null },
+        { is_public: !clipboard.is_public },
         { token }
       ),
     onSuccess: () => {
