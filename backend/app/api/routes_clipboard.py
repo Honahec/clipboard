@@ -1,5 +1,5 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import or_
@@ -93,7 +93,7 @@ async def read_clipboard(
         )
     
     # check expiration
-    if db_clipboard.expires_at and db_clipboard.expires_at < datetime.now():
+    if db_clipboard.expires_at and db_clipboard.expires_at < datetime.now(timezone.utc):
         db.delete(db_clipboard)
         db.commit()
         raise HTTPException(
@@ -129,6 +129,13 @@ async def list_clipboards(
         query = query.filter(Clipboard.is_public == True)
 
     clipboards = query.offset(skip).limit(limit).all()
+    for clipboard in clipboards:
+        # check expiration
+        # print(f'[debug] {clipboard.expires_at} {datetime.now(timezone.utc)}')
+        if clipboard.expires_at and clipboard.expires_at < datetime.now(timezone.utc):
+            db.delete(clipboard)
+            db.commit()
+
     return clipboards
 
 
