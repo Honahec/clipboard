@@ -135,6 +135,7 @@ async def list_clipboards(
         if clipboard.expires_at and clipboard.expires_at < datetime.now(timezone.utc):
             db.delete(clipboard)
             db.commit()
+            clipboards.remove(clipboard)
 
     return clipboards
 
