@@ -43,9 +43,15 @@ async def create_clipboard(
                 if clipboard_data.user not in permitted_ids:
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Cannot assign clipboard to a different user.",
-                    )
+                    detail="Cannot assign clipboard to a different user.",
+                )
                 owner_id = current_user.user_id
+
+            if not clipboard_data.expires_at and not current_user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Authentication required to create a permanent clipboard.",
+                )
 
             db_clipboard = Clipboard(
                 clipboard_id=clipboard_id,
