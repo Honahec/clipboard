@@ -89,7 +89,7 @@ export function ClipboardForm() {
     createMutation.mutate({
       content: content.trim(),
       expires_at,
-      user: isPrivate ? user?.userId ?? null : null,
+      user: user?.userId || null,
       is_public: !isPrivate,
     });
   };
