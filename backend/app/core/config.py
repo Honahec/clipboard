@@ -3,14 +3,13 @@ from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 class Settings(BaseSettings):
     # Database configuration
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/clipboard_db"
     
     # Application configuration
     APP_NAME: str = "Clipboard API"
-    APP_VERSION: str = "1.0.0"
+    APP_VERSION: str = "1.0.1"
     DEBUG: bool = True
     
     # CORS configuration
