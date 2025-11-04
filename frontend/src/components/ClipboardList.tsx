@@ -37,11 +37,15 @@ function ClipboardCard({
   onDelete,
   onToggleVisibility,
   canManage,
+  isDeleting,
+  isToggling,
 }: {
   clipboard: ClipboardRecord;
   onDelete: (clipboardId: string) => void;
   onToggleVisibility: (clipboard: ClipboardRecord) => void;
   canManage: boolean;
+  isDeleting: boolean;
+  isToggling: boolean;
 }) {
   const isPrivate = !clipboard.is_public;
   return (
@@ -88,6 +92,8 @@ function ClipboardCard({
                 size='sm'
                 variant='outline'
                 onClick={() => onToggleVisibility(clipboard)}
+                isLoading={isToggling}
+                isDisabled={isDeleting || isToggling}
               >
                 {clipboard.is_public ? '设为仅本人可见' : '设为公开'}
               </Button>
@@ -97,6 +103,8 @@ function ClipboardCard({
                 aria-label='删除剪贴板'
                 icon={<DeleteIcon />}
                 onClick={() => onDelete(clipboard.clipboard_id)}
+                isLoading={isDeleting}
+                isDisabled={isDeleting || isToggling}
               />
             </Flex>
           )}
@@ -234,6 +242,12 @@ export function ClipboardList() {
       {clipboards.map((clipboard) => {
         const canManage =
           Boolean(user?.userId) && clipboard.user === user?.userId;
+        const isDeleting =
+          deleteMutation.isPending &&
+          deleteMutation.variables === clipboard.clipboard_id;
+        const isToggling =
+          toggleMutation.isPending &&
+          toggleMutation.variables?.clipboard_id === clipboard.clipboard_id;
         return (
           <ClipboardCard
             key={clipboard.clipboard_id}
@@ -241,6 +255,8 @@ export function ClipboardList() {
             onDelete={handleDelete}
             onToggleVisibility={handleToggle}
             canManage={canManage}
+            isDeleting={isDeleting}
+            isToggling={isToggling}
           />
         );
       })}
