@@ -39,7 +39,7 @@ export function ClipboardForm() {
   const queryClient = useQueryClient();
 
   const [content, setContent] = useState('');
-  const [expiryOption, setExpiryOption] = useState<ExpiryOption>('none');
+  const [expiryOption, setExpiryOption] = useState<ExpiryOption>('1h');
   const [isPrivate, setIsPrivate] = useState(false);
 
   const createMutation = useMutation({
@@ -120,10 +120,10 @@ export function ClipboardForm() {
                   setExpiryOption(event.target.value as ExpiryOption)
                 }
               >
-                {isAuthenticated && <option value='none'>永不过期</option>}
                 <option value='1h'>1 小时后</option>
                 <option value='24h'>24 小时后</option>
                 <option value='7d'>7 天后</option>
+                {isAuthenticated && <option value='none'>永不过期</option>}
               </Select>
             </FormControl>
 
