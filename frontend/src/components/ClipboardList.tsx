@@ -238,7 +238,7 @@ export function ClipboardList() {
   }
 
   return (
-    <SimpleGrid spacing={4} minChildWidth='280px'>
+    <SimpleGrid spacing={3}>
       {clipboards.map((clipboard) => {
         const canManage =
           Boolean(user?.userId) && clipboard.user === user?.userId;
