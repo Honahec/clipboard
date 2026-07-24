@@ -1,70 +1,66 @@
-import {
-  Box,
-  Container,
-  Flex,
-  Heading,
-  Stack,
-  Text,
-  useColorModeValue,
-} from '@chakra-ui/react';
+import { useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { toast } from "sonner"
 
-import { AuthControls } from './components/AuthControls';
-import { ClipboardForm } from './components/ClipboardForm';
-import { ClipboardList } from './components/ClipboardList';
-import { useAuth } from './providers/useAuth';
+import { AppHeader } from "@/components/app-header"
+import { ClipboardFeed } from "@/components/clipboard-feed"
+import { CodeLookup } from "@/components/code-lookup"
+import { ComposeForm } from "@/components/compose-form"
+import { api } from "@/lib/api"
+import type { Clipboard } from "@/lib/types"
 
-function App() {
-  const { isAuthenticated } = useAuth();
-  const heroBg = useColorModeValue('white', 'gray.800');
-  const heroBorder = useColorModeValue('gray.200', 'gray.700');
+export default function App() {
+  const [pinned, setPinned] = useState<Clipboard>()
+  const session = useQuery({
+    queryKey: ["session"],
+    queryFn: api.session,
+    staleTime: 60_000,
+  })
+
+  useEffect(() => {
+    const authError = new URLSearchParams(window.location.search).get("auth_error")
+    if (authError) {
+      toast.error("登录失败，请重试")
+      window.history.replaceState(null, "", "/")
+    }
+  }, [])
+
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("code")
+    if (!code) return
+    void api
+      .getClipboard(code)
+      .then(setPinned)
+      .catch(() => toast.error(`无法打开分享代码 ${code.toUpperCase()}`))
+  }, [])
 
   return (
-    <Box minH='100vh' bgGradient='linear(to-br, orange.50, gray.100)'>
-      <Container maxW='6xl' py={{ base: 8, md: 12 }}>
-        <Stack spacing={10}>
-          <Flex
-            direction={{ base: 'column', md: 'row' }}
-            align={{ base: 'flex-start', md: 'center' }}
-            justify='space-between'
-            bg={heroBg}
-            border='1px solid'
-            borderColor={heroBorder}
-            borderRadius='2xl'
-            p={{ base: 6, md: 8 }}
-            boxShadow='lg'
-            gap={6}
-          >
-            <Stack spacing={3}>
-              <Heading
-                size={{ base: 'lg', md: 'xl' }}
-                bgGradient='linear(to-r, orange.400, pink.500)'
-                bgClip='text'
-              >
-                云朵角落 Clipboard
-              </Heading>
-              <Text fontSize='md' color='gray.600'>
-                创建可分享的剪贴板，支持匿名访问。登录云朵角落账号后可开启「仅自己可见」，
-                保护你的私密内容。
-              </Text>
-              {!isAuthenticated && (
-                <Text fontSize='sm' color='gray.500'>
-                  未登录状态下创建的剪贴板为公开，可供任何访客浏览。
-                </Text>
-              )}
-            </Stack>
-            <AuthControls />
-          </Flex>
-
-          <ClipboardForm />
-
-          <Stack spacing={4}>
-            <Heading size='md'>剪贴板列表</Heading>
-            <ClipboardList />
-          </Stack>
-        </Stack>
-      </Container>
-    </Box>
-  );
+    <div className="min-h-dvh bg-muted/30">
+      <AppHeader session={session.data} loading={session.isPending} />
+      <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start">
+        <aside className="lg:sticky lg:top-6">
+          <ComposeForm session={session.data} onCreated={setPinned} />
+        </aside>
+        <section className="flex min-w-0 flex-col gap-5">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+            <div>
+              <h2 className="text-lg font-semibold">共享剪贴板</h2>
+              <p className="text-sm text-muted-foreground">使用短代码快速取回一段文本。</p>
+            </div>
+            <CodeLookup onFound={setPinned} />
+          </div>
+          <ClipboardFeed
+            session={session.data}
+            pinned={pinned}
+            onDeleted={(code) => {
+              if (pinned?.code === code) setPinned(undefined)
+            }}
+            onUpdated={(clipboard) => {
+              if (pinned?.code === clipboard.code) setPinned(clipboard)
+            }}
+          />
+        </section>
+      </main>
+    </div>
+  )
 }
-
-export default App;

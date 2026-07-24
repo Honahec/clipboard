@@ -1,23 +1,31 @@
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import { ChakraProvider, ColorModeScript } from '@chakra-ui/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { StrictMode } from "react"
+import { createRoot } from "react-dom/client"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { ThemeProvider } from "next-themes"
 
-import App from './App.tsx';
-import { AuthProvider } from './providers/AuthProvider.tsx';
-import theme from './theme';
+import App from "@/App"
+import { Toaster } from "@/components/ui/sonner"
+import { TooltipProvider } from "@/components/ui/tooltip"
+import "@/index.css"
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+})
 
-createRoot(document.getElementById('root')!).render(
+createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ChakraProvider theme={theme}>
-      <ColorModeScript initialColorMode={theme.config.initialColorMode} />
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
+        <TooltipProvider>
           <App />
-        </AuthProvider>
+          <Toaster position="top-center" />
+        </TooltipProvider>
       </QueryClientProvider>
-    </ChakraProvider>
-  </StrictMode>
-);
+    </ThemeProvider>
+  </StrictMode>,
+)
