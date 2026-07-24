@@ -36,12 +36,12 @@ export function CodeLookup({ onFound }: { onFound: (clipboard: Clipboard) => voi
   }
 
   return (
-    <form onSubmit={submit} className="w-full sm:w-64">
+    <form onSubmit={submit} className="min-w-0 flex-1 sm:max-w-56">
       <InputGroup>
         <InputGroupInput
           value={code}
           onChange={(event) => setCode(normalizeCode(event.target.value))}
-          placeholder="输入分享代码"
+          placeholder="分享代码"
           aria-label="分享代码"
           autoComplete="off"
         />

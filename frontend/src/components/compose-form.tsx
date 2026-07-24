@@ -1,14 +1,14 @@
 import { useMemo, useState, type FormEvent } from "react"
-import { SendIcon } from "lucide-react"
+import { PlusIcon } from "lucide-react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -94,7 +94,10 @@ export function ComposeForm({
       <Card>
         <CardHeader>
           <CardTitle>新建剪贴板</CardTitle>
-          <CardDescription>粘贴文本，生成一个便于分享的短代码。</CardDescription>
+          <CardDescription>{signedIn ? "登录账户" : "匿名"}</CardDescription>
+          <CardAction className="text-sm text-muted-foreground">
+            {content.length.toLocaleString()} / 100,000
+          </CardAction>
         </CardHeader>
         <CardContent>
           <FieldGroup>
@@ -104,57 +107,59 @@ export function ComposeForm({
                 id="clipboard-content"
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
-                placeholder="在这里输入或粘贴文本..."
-                className="min-h-44 resize-y"
+                placeholder="输入或粘贴内容"
+                className="min-h-64 resize-y"
                 maxLength={100_000}
                 required
               />
-              <FieldDescription>{content.length.toLocaleString()} / 100,000</FieldDescription>
             </Field>
 
-            <Field>
-              <FieldLabel htmlFor="clipboard-expiry">保留时间</FieldLabel>
-              <Select value={expiry} onValueChange={(value) => setExpiry(value as Expiry)}>
-                <SelectTrigger id="clipboard-expiry" className="w-full">
-                  <SelectValue placeholder="选择保留时间" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="1h">1 小时</SelectItem>
-                    <SelectItem value="24h">24 小时</SelectItem>
-                    <SelectItem value="7d">7 天</SelectItem>
-                    {signedIn ? <SelectItem value="never">永久保留</SelectItem> : null}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="clipboard-expiry">保留时间</FieldLabel>
+                <Select value={expiry} onValueChange={(value) => setExpiry(value as Expiry)}>
+                  <SelectTrigger id="clipboard-expiry" className="w-full">
+                    <SelectValue placeholder="选择保留时间" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="1h">1 小时</SelectItem>
+                      <SelectItem value="24h">24 小时</SelectItem>
+                      <SelectItem value="7d">7 天</SelectItem>
+                      {signedIn ? <SelectItem value="never">永久保留</SelectItem> : null}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
 
-            <Field orientation="horizontal" data-disabled={!signedIn}>
-              <FieldContent>
-                <FieldTitle id="private-title">仅自己可见</FieldTitle>
-                <FieldDescription>
-                  {signedIn ? "不会出现在公共列表中。" : "登录后可以创建私有内容。"}
-                </FieldDescription>
-              </FieldContent>
-              <Switch
-                aria-labelledby="private-title"
-                checked={signedIn && isPrivate}
-                onCheckedChange={setIsPrivate}
-                disabled={!signedIn}
-              />
-            </Field>
+              <Field orientation="horizontal" data-disabled={!signedIn} className="self-end">
+                <FieldContent>
+                  <FieldTitle id="private-title">仅自己可见</FieldTitle>
+                  <FieldDescription>
+                    {signedIn ? "私有剪贴板" : "登录后可用"}
+                  </FieldDescription>
+                </FieldContent>
+                <Switch
+                  aria-labelledby="private-title"
+                  checked={signedIn && isPrivate}
+                  onCheckedChange={setIsPrivate}
+                  disabled={!signedIn}
+                />
+              </Field>
+            </div>
+
+            <div className="flex justify-end">
+              <Button type="submit" disabled={!valid || create.isPending}>
+                {create.isPending ? (
+                  <Spinner data-icon="inline-start" />
+                ) : (
+                  <PlusIcon data-icon="inline-start" />
+                )}
+                {create.isPending ? "正在创建" : "创建"}
+              </Button>
+            </div>
           </FieldGroup>
         </CardContent>
-        <CardFooter className="justify-end">
-          <Button type="submit" disabled={!valid || create.isPending}>
-            {create.isPending ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <SendIcon data-icon="inline-start" />
-            )}
-            {create.isPending ? "正在创建" : "创建"}
-          </Button>
-        </CardFooter>
       </Card>
     </form>
   )
