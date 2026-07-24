@@ -1,27 +1,14 @@
-import { CloudIcon, LogInIcon, LogOutIcon, UserIcon } from "lucide-react"
+import { LogInIcon, LogOutIcon, RefreshCwIcon } from "lucide-react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { ThemeMenu } from "@/components/theme-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { api, errorMessage } from "@/lib/api"
 import type { Session } from "@/lib/types"
-
-function initials(name?: string, email?: string) {
-  const value = name || email || "U"
-  return value.trim().slice(0, 2).toUpperCase()
-}
 
 function AccountMenu({ session }: { session: Session }) {
   const queryClient = useQueryClient()
@@ -37,52 +24,32 @@ function AccountMenu({ session }: { session: Session }) {
   if (!session.authenticated || !session.user) {
     if (!session.oidc_enabled) return null
     return (
-      <Button asChild>
-        <a href="/api/auth/login">
-          <LogInIcon data-icon="inline-start" />
-          登录
-        </a>
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button asChild variant="outline" size="icon-sm" aria-label="登录">
+            <a href="/api/auth/login"><LogInIcon /></a>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>登录</TooltipContent>
+      </Tooltip>
     )
   }
 
-  const user = session.user
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="账户菜单">
-          <Avatar size="sm">
-            {user.picture ? <AvatarImage src={user.picture} alt="" /> : null}
-            <AvatarFallback>{initials(user.name, user.email)}</AvatarFallback>
-          </Avatar>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon-sm"
+          aria-label="退出登录"
+          disabled={logout.isPending}
+          onClick={() => logout.mutate()}
+        >
+          {logout.isPending ? <Spinner /> : <LogOutIcon />}
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-52">
-        <DropdownMenuGroup>
-          <DropdownMenuLabel className="flex flex-col">
-            <span>{user.name || "已登录用户"}</span>
-            {user.email ? (
-              <span className="truncate">{user.email}</span>
-            ) : null}
-          </DropdownMenuLabel>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem disabled>
-            <UserIcon />
-            我的剪贴板
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            variant="destructive"
-            disabled={logout.isPending}
-            onSelect={() => logout.mutate()}
-          >
-            <LogOutIcon />
-            退出登录
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </TooltipTrigger>
+      <TooltipContent>退出登录</TooltipContent>
+    </Tooltip>
   )
 }
 
@@ -93,19 +60,34 @@ export function AppHeader({
   session?: Session
   loading: boolean
 }) {
+  const queryClient = useQueryClient()
+  const user = session?.user
+
   return (
-    <header className="border-b bg-background/95">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <CloudIcon className="size-4" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold">Clipboard</h1>
-            <p className="truncate text-xs text-muted-foreground">云朵角落</p>
-          </div>
+    <header className="border-b">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="min-w-0">
+          <h1 className="text-lg font-semibold">Clipboard</h1>
+          <p className="truncate text-sm text-muted-foreground">
+            {user ? [user.name, user.email].filter(Boolean).join(" · ") : "匿名访问"}
+          </p>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label="刷新"
+                onClick={() =>
+                  void queryClient.invalidateQueries({ queryKey: ["clipboards"] })
+                }
+              >
+                <RefreshCwIcon />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>刷新</TooltipContent>
+          </Tooltip>
           <ThemeMenu />
           {loading ? (
             <Skeleton className="size-8" />
