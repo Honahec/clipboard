@@ -1,0 +1,181 @@
+import { createContext, useContext } from "react"
+
+const english = {
+  "meta.description": "A simple shared clipboard",
+  "tabs.create": "New",
+  "tabs.recent": "Recent",
+  "tabs.mine": "Mine",
+  "header.anonymous": "Anonymous access",
+  "header.refresh": "Refresh",
+  "header.login": "Sign in",
+  "header.logout": "Sign out",
+  "header.loggedOut": "Signed out",
+  "header.switchLanguage": "Switch to Chinese",
+  "theme.toggle": "Toggle theme",
+  "errors.requestFailed": "Request failed. Please try again.",
+  "errors.authFailed": "Sign-in failed. Please try again.",
+  "errors.openCode": "Could not open share code {code}",
+  "errors.clipboardAccess": "Could not access the clipboard",
+  "compose.created": "Clipboard created",
+  "compose.shareCode": "Share code {code}",
+  "compose.createFailed": "Could not create clipboard",
+  "compose.title": "New clipboard",
+  "compose.account": "Signed-in account",
+  "compose.anonymous": "Anonymous",
+  "compose.content": "Content",
+  "compose.placeholder": "Type or paste content",
+  "compose.retention": "Retention",
+  "compose.selectRetention": "Select retention",
+  "compose.oneHour": "1 hour",
+  "compose.twentyFourHours": "24 hours",
+  "compose.sevenDays": "7 days",
+  "compose.forever": "Forever",
+  "compose.privateTitle": "Private",
+  "compose.privateDescription": "Only listed for your account",
+  "compose.privateRequiresLogin": "Available after sign-in",
+  "compose.creating": "Creating",
+  "compose.create": "Create",
+  "lookup.found": "Found {code}",
+  "lookup.failed": "Lookup failed",
+  "lookup.placeholder": "Share code",
+  "lookup.label": "Share code",
+  "lookup.submit": "Find clipboard",
+  "feed.public": "Public",
+  "feed.private": "Private",
+  "feed.mine": "My clipboards",
+  "feed.recent": "Recent clipboards",
+  "feed.records": "{count} records",
+  "feed.record": "1 record",
+  "feed.refresh": "Refresh list",
+  "feed.loadFailed": "Could not load clipboards",
+  "feed.emptyTitle": "No clipboards",
+  "feed.emptyDescription": "There are no records in this view.",
+  "feed.code": "Code",
+  "feed.content": "Content",
+  "feed.visibility": "Visibility",
+  "feed.expires": "Expires",
+  "feed.created": "Created",
+  "feed.actions": "Actions",
+  "feed.expiresPrefix": "Expires {date}",
+  "feed.never": "Never",
+  "actions.visibilityUpdated": "Visibility updated",
+  "actions.deleted": "Clipboard deleted",
+  "actions.view": "View content",
+  "actions.copyContent": "Copy content",
+  "actions.copyLink": "Copy share link",
+  "actions.contentCopied": "Content copied",
+  "actions.linkCopied": "Share link copied",
+  "actions.makePrivate": "Make private",
+  "actions.makePublic": "Make public",
+  "actions.delete": "Delete",
+  "actions.deleteTitle": "Delete {code}?",
+  "actions.deleteDescription": "The share code and link will stop working immediately.",
+  "actions.cancel": "Cancel",
+  "detail.expires": "Expires {date}",
+} as const
+
+type TranslationKey = keyof typeof english
+
+const chinese: Record<TranslationKey, string> = {
+  "meta.description": "云朵角落共享剪贴板",
+  "tabs.create": "新建",
+  "tabs.recent": "最近",
+  "tabs.mine": "我的",
+  "header.anonymous": "匿名访问",
+  "header.refresh": "刷新",
+  "header.login": "登录",
+  "header.logout": "退出登录",
+  "header.loggedOut": "已退出登录",
+  "header.switchLanguage": "Switch to English",
+  "theme.toggle": "切换主题",
+  "errors.requestFailed": "请求失败，请稍后重试",
+  "errors.authFailed": "登录失败，请重试",
+  "errors.openCode": "无法打开分享代码 {code}",
+  "errors.clipboardAccess": "无法访问剪贴板",
+  "compose.created": "剪贴板已创建",
+  "compose.shareCode": "分享代码 {code}",
+  "compose.createFailed": "创建失败",
+  "compose.title": "新建剪贴板",
+  "compose.account": "登录账户",
+  "compose.anonymous": "匿名",
+  "compose.content": "内容",
+  "compose.placeholder": "输入或粘贴内容",
+  "compose.retention": "保留时间",
+  "compose.selectRetention": "选择保留时间",
+  "compose.oneHour": "1 小时",
+  "compose.twentyFourHours": "24 小时",
+  "compose.sevenDays": "7 天",
+  "compose.forever": "永久保留",
+  "compose.privateTitle": "仅自己可见",
+  "compose.privateDescription": "仅在你的账户列表中显示",
+  "compose.privateRequiresLogin": "登录后可用",
+  "compose.creating": "正在创建",
+  "compose.create": "创建",
+  "lookup.found": "已找到 {code}",
+  "lookup.failed": "无法查找",
+  "lookup.placeholder": "分享代码",
+  "lookup.label": "分享代码",
+  "lookup.submit": "查找剪贴板",
+  "feed.public": "公开",
+  "feed.private": "私有",
+  "feed.mine": "我的剪贴板",
+  "feed.recent": "最近内容",
+  "feed.records": "{count} 条记录",
+  "feed.record": "1 条记录",
+  "feed.refresh": "刷新列表",
+  "feed.loadFailed": "无法加载剪贴板",
+  "feed.emptyTitle": "暂无剪贴板",
+  "feed.emptyDescription": "没有符合当前范围的记录。",
+  "feed.code": "代码",
+  "feed.content": "内容",
+  "feed.visibility": "可见性",
+  "feed.expires": "到期",
+  "feed.created": "创建时间",
+  "feed.actions": "操作",
+  "feed.expiresPrefix": "到期 {date}",
+  "feed.never": "永久",
+  "actions.visibilityUpdated": "可见性已更新",
+  "actions.deleted": "剪贴板已删除",
+  "actions.view": "查看内容",
+  "actions.copyContent": "复制内容",
+  "actions.copyLink": "复制分享链接",
+  "actions.contentCopied": "内容已复制",
+  "actions.linkCopied": "分享链接已复制",
+  "actions.makePrivate": "设为私有",
+  "actions.makePublic": "设为公开",
+  "actions.delete": "删除",
+  "actions.deleteTitle": "删除 {code}？",
+  "actions.deleteDescription": "删除后，分享代码和链接将立即失效。",
+  "actions.cancel": "取消",
+  "detail.expires": "到期 {date}",
+}
+
+export type Language = "en" | "zh-CN"
+export type TranslationValues = Record<string, string | number>
+export type Translate = (key: TranslationKey, values?: TranslationValues) => string
+
+export type I18nContextValue = {
+  language: Language
+  locale: string
+  t: Translate
+  toggleLanguage: () => void
+}
+
+export const I18nContext = createContext<I18nContextValue | undefined>(undefined)
+
+export function translate(
+  language: Language,
+  key: TranslationKey,
+  values: TranslationValues = {},
+) {
+  const dictionary = language === "zh-CN" ? chinese : english
+  return dictionary[key].replace(/\{(\w+)\}/g, (_, name: string) =>
+    String(values[name] ?? `{${name}}`),
+  )
+}
+
+export function useI18n() {
+  const value = useContext(I18nContext)
+  if (!value) throw new Error("useI18n must be used inside LanguageProvider")
+  return value
+}

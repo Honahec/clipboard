@@ -3,9 +3,11 @@ import { useTheme } from "next-themes"
 
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useI18n } from "@/lib/i18n"
 
 export function ThemeMenu() {
   const { resolvedTheme, setTheme } = useTheme()
+  const { t } = useI18n()
   const isDark = resolvedTheme === "dark"
 
   return (
@@ -15,13 +17,13 @@ export function ThemeMenu() {
           type="button"
           variant="outline"
           size="icon-sm"
-          aria-label="切换主题"
+          aria-label={t("theme.toggle")}
           onClick={() => setTheme(isDark ? "light" : "dark")}
         >
           {isDark ? <SunIcon /> : <MoonIcon />}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>切换主题</TooltipContent>
+      <TooltipContent>{t("theme.toggle")}</TooltipContent>
     </Tooltip>
   )
 }
