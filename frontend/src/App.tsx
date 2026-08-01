@@ -14,7 +14,7 @@ import type { Clipboard } from "@/lib/types"
 export default function App() {
   const { t } = useI18n()
   const [pinned, setPinned] = useState<Clipboard>()
-  const [tab, setTab] = useState("create")
+  const [tab, setTab] = useState("recent")
   const session = useQuery({
     queryKey: ["session"],
     queryFn: api.session,
