@@ -8,9 +8,11 @@ import { CodeLookup } from "@/components/code-lookup"
 import { ComposeForm } from "@/components/compose-form"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { api } from "@/lib/api"
+import { useI18n } from "@/lib/i18n"
 import type { Clipboard } from "@/lib/types"
 
 export default function App() {
+  const { t } = useI18n()
   const [pinned, setPinned] = useState<Clipboard>()
   const [tab, setTab] = useState("create")
   const session = useQuery({
@@ -22,10 +24,10 @@ export default function App() {
   useEffect(() => {
     const authError = new URLSearchParams(window.location.search).get("auth_error")
     if (authError) {
-      toast.error("登录失败，请重试")
+      toast.error(t("errors.authFailed"))
       window.history.replaceState(null, "", "/")
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get("code")
@@ -36,8 +38,8 @@ export default function App() {
         setPinned(clipboard)
         setTab("recent")
       })
-      .catch(() => toast.error(`无法打开分享代码 ${code.toUpperCase()}`))
-  }, [])
+      .catch(() => toast.error(t("errors.openCode", { code: code.toUpperCase() })))
+  }, [t])
 
   return (
     <div className="min-h-dvh bg-background">
@@ -45,10 +47,10 @@ export default function App() {
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
-            <TabsTrigger value="create">新建</TabsTrigger>
-            <TabsTrigger value="recent">最近</TabsTrigger>
+            <TabsTrigger value="create">{t("tabs.create")}</TabsTrigger>
+            <TabsTrigger value="recent">{t("tabs.recent")}</TabsTrigger>
             {session.data?.authenticated ? (
-              <TabsTrigger value="mine">我的</TabsTrigger>
+              <TabsTrigger value="mine">{t("tabs.mine")}</TabsTrigger>
             ) : null}
           </TabsList>
           <TabsContent value="create">

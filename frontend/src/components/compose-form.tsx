@@ -32,6 +32,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { api, errorMessage } from "@/lib/api"
+import { useI18n } from "@/lib/i18n"
 import type { Clipboard, Session } from "@/lib/types"
 
 type Expiry = "1h" | "24h" | "7d" | "never"
@@ -54,6 +55,7 @@ export function ComposeForm({
   session?: Session
   onCreated: (clipboard: Clipboard) => void
 }) {
+  const { locale, t } = useI18n()
   const queryClient = useQueryClient()
   const [content, setContent] = useState("")
   const [expiry, setExpiry] = useState<Expiry>("24h")
@@ -67,11 +69,13 @@ export function ComposeForm({
       setIsPrivate(false)
       onCreated(clipboard)
       await queryClient.invalidateQueries({ queryKey: ["clipboards"] })
-      toast.success("剪贴板已创建", {
-        description: `分享代码 ${clipboard.code}`,
+      toast.success(t("compose.created"), {
+        description: t("compose.shareCode", { code: clipboard.code }),
       })
     },
-    onError: (error) => toast.error("创建失败", { description: errorMessage(error) }),
+    onError: (error) => toast.error(t("compose.createFailed"), {
+      description: errorMessage(error, t("errors.requestFailed")),
+    }),
   })
 
   const valid = useMemo(
@@ -93,21 +97,23 @@ export function ComposeForm({
     <form onSubmit={submit}>
       <Card>
         <CardHeader>
-          <CardTitle>新建剪贴板</CardTitle>
-          <CardDescription>{signedIn ? "登录账户" : "匿名"}</CardDescription>
+          <CardTitle>{t("compose.title")}</CardTitle>
+          <CardDescription>
+            {signedIn ? t("compose.account") : t("compose.anonymous")}
+          </CardDescription>
           <CardAction className="text-sm text-muted-foreground">
-            {content.length.toLocaleString()} / 100,000
+            {content.length.toLocaleString(locale)} / {(100_000).toLocaleString(locale)}
           </CardAction>
         </CardHeader>
         <CardContent>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="clipboard-content">内容</FieldLabel>
+              <FieldLabel htmlFor="clipboard-content">{t("compose.content")}</FieldLabel>
               <Textarea
                 id="clipboard-content"
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
-                placeholder="输入或粘贴内容"
+                placeholder={t("compose.placeholder")}
                 className="min-h-64 resize-y"
                 maxLength={100_000}
                 required
@@ -116,17 +122,21 @@ export function ComposeForm({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
-                <FieldLabel htmlFor="clipboard-expiry">保留时间</FieldLabel>
+                <FieldLabel htmlFor="clipboard-expiry">
+                  {t("compose.retention")}
+                </FieldLabel>
                 <Select value={expiry} onValueChange={(value) => setExpiry(value as Expiry)}>
                   <SelectTrigger id="clipboard-expiry" className="w-full">
-                    <SelectValue placeholder="选择保留时间" />
+                    <SelectValue placeholder={t("compose.selectRetention")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="1h">1 小时</SelectItem>
-                      <SelectItem value="24h">24 小时</SelectItem>
-                      <SelectItem value="7d">7 天</SelectItem>
-                      {signedIn ? <SelectItem value="never">永久保留</SelectItem> : null}
+                      <SelectItem value="1h">{t("compose.oneHour")}</SelectItem>
+                      <SelectItem value="24h">{t("compose.twentyFourHours")}</SelectItem>
+                      <SelectItem value="7d">{t("compose.sevenDays")}</SelectItem>
+                      {signedIn ? (
+                        <SelectItem value="never">{t("compose.forever")}</SelectItem>
+                      ) : null}
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -134,9 +144,11 @@ export function ComposeForm({
 
               <Field orientation="horizontal" data-disabled={!signedIn} className="self-end">
                 <FieldContent>
-                  <FieldTitle id="private-title">仅自己可见</FieldTitle>
+                  <FieldTitle id="private-title">{t("compose.privateTitle")}</FieldTitle>
                   <FieldDescription>
-                    {signedIn ? "私有剪贴板" : "登录后可用"}
+                    {signedIn
+                      ? t("compose.privateDescription")
+                      : t("compose.privateRequiresLogin")}
                   </FieldDescription>
                 </FieldContent>
                 <Switch
@@ -155,7 +167,7 @@ export function ComposeForm({
                 ) : (
                   <PlusIcon data-icon="inline-start" />
                 )}
-                {create.isPending ? "正在创建" : "创建"}
+                {create.isPending ? t("compose.creating") : t("compose.create")}
               </Button>
             </div>
           </FieldGroup>

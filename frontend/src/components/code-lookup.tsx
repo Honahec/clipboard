@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/input-group"
 import { Spinner } from "@/components/ui/spinner"
 import { api, errorMessage } from "@/lib/api"
+import { useI18n } from "@/lib/i18n"
 import type { Clipboard } from "@/lib/types"
 
 function normalizeCode(value: string) {
@@ -18,15 +19,18 @@ function normalizeCode(value: string) {
 }
 
 export function CodeLookup({ onFound }: { onFound: (clipboard: Clipboard) => void }) {
+  const { t } = useI18n()
   const [code, setCode] = useState("")
   const lookup = useMutation({
     mutationFn: api.getClipboard,
     onSuccess: (clipboard) => {
       onFound(clipboard)
       window.history.replaceState(null, "", `/?code=${clipboard.code}`)
-      toast.success(`已找到 ${clipboard.code}`)
+      toast.success(t("lookup.found", { code: clipboard.code }))
     },
-    onError: (error) => toast.error("无法查找", { description: errorMessage(error) }),
+    onError: (error) => toast.error(t("lookup.failed"), {
+      description: errorMessage(error, t("errors.requestFailed")),
+    }),
   })
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -41,15 +45,15 @@ export function CodeLookup({ onFound }: { onFound: (clipboard: Clipboard) => voi
         <InputGroupInput
           value={code}
           onChange={(event) => setCode(normalizeCode(event.target.value))}
-          placeholder="分享代码"
-          aria-label="分享代码"
+          placeholder={t("lookup.placeholder")}
+          aria-label={t("lookup.label")}
           autoComplete="off"
         />
         <InputGroupAddon align="inline-end">
           <InputGroupButton
             type="submit"
             size="icon-xs"
-            aria-label="查找剪贴板"
+            aria-label={t("lookup.submit")}
             disabled={!code || lookup.isPending}
           >
             {lookup.isPending ? <Spinner /> : <SearchIcon />}

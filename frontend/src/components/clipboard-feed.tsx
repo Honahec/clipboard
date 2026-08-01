@@ -33,6 +33,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { api, errorMessage } from "@/lib/api"
 import { formatDate, formatExpiry } from "@/lib/clipboard"
+import { useI18n } from "@/lib/i18n"
 import type { Clipboard, Session } from "@/lib/types"
 
 function preview(content: string) {
@@ -40,9 +41,10 @@ function preview(content: string) {
 }
 
 function VisibilityBadge({ clipboard }: { clipboard: Clipboard }) {
+  const { t } = useI18n()
   return (
     <Badge variant={clipboard.is_public ? "secondary" : "outline"}>
-      {clipboard.is_public ? "公开" : "私有"}
+      {clipboard.is_public ? t("feed.public") : t("feed.private")}
     </Badge>
   )
 }
@@ -78,6 +80,7 @@ export function ClipboardFeed({
   onDeleted: (code: string) => void
   onUpdated: (clipboard: Clipboard) => void
 }) {
+  const { locale, t } = useI18n()
   const [selected, setSelected] = useState<Clipboard>()
   const query = useQuery({
     queryKey: ["clipboards", session?.authenticated],
@@ -106,13 +109,17 @@ export function ClipboardFeed({
     onDeleted(code)
   }
 
-  const title = mode === "mine" ? "我的剪贴板" : "最近内容"
+  const title = mode === "mine" ? t("feed.mine") : t("feed.recent")
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
-        <CardDescription>{items.length} 条记录</CardDescription>
+        <CardDescription>
+          {items.length === 1
+            ? t("feed.record")
+            : t("feed.records", { count: items.length })}
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <div className="flex items-center justify-end gap-2">
@@ -123,7 +130,7 @@ export function ClipboardFeed({
                 type="button"
                 variant="outline"
                 size="icon-sm"
-                aria-label="刷新列表"
+                aria-label={t("feed.refresh")}
                 onClick={() => void query.refetch()}
                 disabled={query.isFetching}
               >
@@ -132,7 +139,7 @@ export function ClipboardFeed({
                 />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>刷新列表</TooltipContent>
+            <TooltipContent>{t("feed.refresh")}</TooltipContent>
           </Tooltip>
         </div>
 
@@ -140,8 +147,10 @@ export function ClipboardFeed({
         {query.isError ? (
           <Alert variant="destructive">
             <TriangleAlertIcon />
-            <AlertTitle>无法加载剪贴板</AlertTitle>
-            <AlertDescription>{errorMessage(query.error)}</AlertDescription>
+            <AlertTitle>{t("feed.loadFailed")}</AlertTitle>
+            <AlertDescription>
+              {errorMessage(query.error, t("errors.requestFailed"))}
+            </AlertDescription>
           </Alert>
         ) : null}
         {query.isSuccess && items.length === 0 ? (
@@ -150,8 +159,8 @@ export function ClipboardFeed({
               <EmptyMedia variant="icon">
                 <ClipboardIcon />
               </EmptyMedia>
-              <EmptyTitle>暂无剪贴板</EmptyTitle>
-              <EmptyDescription>没有符合当前范围的记录。</EmptyDescription>
+              <EmptyTitle>{t("feed.emptyTitle")}</EmptyTitle>
+              <EmptyDescription>{t("feed.emptyDescription")}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : null}
@@ -161,12 +170,12 @@ export function ClipboardFeed({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>代码</TableHead>
-                    <TableHead>内容</TableHead>
-                    <TableHead>可见性</TableHead>
-                    <TableHead>到期</TableHead>
-                    <TableHead>创建时间</TableHead>
-                    <TableHead className="text-right">操作</TableHead>
+                    <TableHead>{t("feed.code")}</TableHead>
+                    <TableHead>{t("feed.content")}</TableHead>
+                    <TableHead>{t("feed.visibility")}</TableHead>
+                    <TableHead>{t("feed.expires")}</TableHead>
+                    <TableHead>{t("feed.created")}</TableHead>
+                    <TableHead className="text-right">{t("feed.actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -188,10 +197,10 @@ export function ClipboardFeed({
                         <VisibilityBadge clipboard={clipboard} />
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {formatExpiry(clipboard.expires_at)}
+                        {formatExpiry(clipboard.expires_at, locale, t("feed.never"))}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {formatDate(clipboard.created_at)}
+                        {formatDate(clipboard.created_at, locale)}
                       </TableCell>
                       <TableCell>
                         <ClipboardActions
@@ -229,8 +238,16 @@ export function ClipboardFeed({
                   </button>
                   <div className="flex items-end justify-between gap-3">
                     <div className="min-w-0 text-xs text-muted-foreground">
-                      <div>到期 {formatExpiry(clipboard.expires_at)}</div>
-                      <div>{formatDate(clipboard.created_at)}</div>
+                      <div>
+                        {t("feed.expiresPrefix", {
+                          date: formatExpiry(
+                            clipboard.expires_at,
+                            locale,
+                            t("feed.never"),
+                          ),
+                        })}
+                      </div>
+                      <div>{formatDate(clipboard.created_at, locale)}</div>
                     </div>
                     <ClipboardActions
                       clipboard={clipboard}

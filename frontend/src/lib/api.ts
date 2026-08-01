@@ -24,7 +24,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const payload = (await response.json().catch(() => null)) as
       | { error?: string }
       | null
-    throw new ApiError(payload?.error ?? "请求失败，请稍后重试", response.status)
+    throw new ApiError(payload?.error ?? "Request failed. Please try again.", response.status)
   }
 
   if (response.status === 204) {
@@ -55,6 +55,10 @@ export const api = {
     }),
 }
 
-export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "请求失败，请稍后重试"
+export function errorMessage(
+  error: unknown,
+  fallback = "Request failed. Please try again.",
+): string {
+  if (error instanceof ApiError) return fallback
+  return error instanceof Error ? error.message : fallback
 }

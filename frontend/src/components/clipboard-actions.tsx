@@ -25,6 +25,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { api, errorMessage } from "@/lib/api"
 import { copyContent, copyShareLink } from "@/lib/clipboard"
+import { useI18n } from "@/lib/i18n"
 import type { Clipboard } from "@/lib/types"
 
 function IconAction({
@@ -68,42 +69,48 @@ export function ClipboardActions({
   onDeleted: (code: string) => void
   onUpdated: (clipboard: Clipboard) => void
 }) {
+  const { t } = useI18n()
   const queryClient = useQueryClient()
   const visibility = useMutation({
     mutationFn: () => api.setVisibility(clipboard.code, !clipboard.is_public),
     onSuccess: async (updated) => {
       onUpdated(updated)
       await queryClient.invalidateQueries({ queryKey: ["clipboards"] })
-      toast.success("可见性已更新")
+      toast.success(t("actions.visibilityUpdated"))
     },
-    onError: (error) => toast.error(errorMessage(error)),
+    onError: (error) => toast.error(errorMessage(error, t("errors.requestFailed"))),
   })
   const remove = useMutation({
     mutationFn: () => api.deleteClipboard(clipboard.code),
     onSuccess: async () => {
       onDeleted(clipboard.code)
       await queryClient.invalidateQueries({ queryKey: ["clipboards"] })
-      toast.success("剪贴板已删除")
+      toast.success(t("actions.deleted"))
     },
-    onError: (error) => toast.error(errorMessage(error)),
+    onError: (error) => toast.error(errorMessage(error, t("errors.requestFailed"))),
   })
 
-  const reportCopyFailure = () => toast.error("无法访问剪贴板")
+  const copyClipboardContent = () => void copyContent(clipboard)
+    .then(() => toast.success(t("actions.contentCopied")))
+    .catch(() => toast.error(t("errors.clipboardAccess")))
+  const copyClipboardLink = () => void copyShareLink(clipboard)
+    .then(() => toast.success(t("actions.linkCopied")))
+    .catch(() => toast.error(t("errors.clipboardAccess")))
 
   return (
     <div className="flex items-center justify-end gap-1">
-      <IconAction label="查看内容" onClick={onOpen}>
+      <IconAction label={t("actions.view")} onClick={onOpen}>
         <EyeIcon />
       </IconAction>
       <IconAction
-        label="复制内容"
-        onClick={() => void copyContent(clipboard).catch(reportCopyFailure)}
+        label={t("actions.copyContent")}
+        onClick={copyClipboardContent}
       >
         <CopyIcon />
       </IconAction>
       <IconAction
-        label="复制分享链接"
-        onClick={() => void copyShareLink(clipboard).catch(reportCopyFailure)}
+        label={t("actions.copyLink")}
+        onClick={copyClipboardLink}
       >
         <LinkIcon />
       </IconAction>
@@ -111,7 +118,7 @@ export function ClipboardActions({
       {clipboard.owned_by_me ? (
         <>
           <IconAction
-            label={clipboard.is_public ? "设为私有" : "设为公开"}
+            label={clipboard.is_public ? t("actions.makePrivate") : t("actions.makePublic")}
             onClick={() => visibility.mutate()}
             disabled={visibility.isPending || remove.isPending}
           >
@@ -132,26 +139,28 @@ export function ClipboardActions({
                     type="button"
                     variant="ghost"
                     size="icon-xs"
-                    aria-label="删除"
+                    aria-label={t("actions.delete")}
                     disabled={remove.isPending}
                   >
                     {remove.isPending ? <Spinner /> : <Trash2Icon />}
                   </Button>
                 </AlertDialogTrigger>
               </TooltipTrigger>
-              <TooltipContent>删除</TooltipContent>
+              <TooltipContent>{t("actions.delete")}</TooltipContent>
             </Tooltip>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>删除 {clipboard.code}？</AlertDialogTitle>
+                <AlertDialogTitle>
+                  {t("actions.deleteTitle", { code: clipboard.code })}
+                </AlertDialogTitle>
                 <AlertDialogDescription>
-                  删除后，分享代码和链接将立即失效。
+                  {t("actions.deleteDescription")}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>取消</AlertDialogCancel>
+                <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
                 <AlertDialogAction variant="destructive" onClick={() => remove.mutate()}>
-                  删除
+                  {t("actions.delete")}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
