@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -27,14 +28,22 @@ const anonymousMaxLifetime = 7 * 24 * time.Hour
 
 type Server struct {
 	store     store.Repository
-	auth      *auth.Manager
+	auth      authProvider
 	publicURL string
 	webDir    string
 	logger    *slog.Logger
 	handler   http.Handler
 }
 
-func New(repository store.Repository, authManager *auth.Manager, publicURL, webDir string, logger *slog.Logger) *Server {
+type authProvider interface {
+	Enabled() bool
+	StartLogin(http.ResponseWriter, *http.Request) error
+	FinishLogin(context.Context, http.ResponseWriter, *http.Request) (auth.User, error)
+	User(*http.Request) *auth.User
+	Logout(http.ResponseWriter)
+}
+
+func New(repository store.Repository, authManager authProvider, publicURL, webDir string, logger *slog.Logger) *Server {
 	server := &Server{store: repository, auth: authManager, publicURL: strings.TrimRight(publicURL, "/"), webDir: webDir, logger: logger}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", server.health)
@@ -45,6 +54,7 @@ func New(repository store.Repository, authManager *auth.Manager, publicURL, webD
 	mux.HandleFunc("GET /api/clipboards", server.listClipboards)
 	mux.HandleFunc("POST /api/clipboards", server.createClipboard)
 	mux.HandleFunc("GET /api/clipboards/{code}", server.getClipboard)
+	mux.HandleFunc("POST /api/clipboards/{code}/refresh-code", server.refreshClipboardCode)
 	mux.HandleFunc("PATCH /api/clipboards/{code}", server.updateClipboard)
 	mux.HandleFunc("DELETE /api/clipboards/{code}", server.deleteClipboard)
 	mux.HandleFunc("GET /", server.static)
@@ -118,6 +128,41 @@ func (s *Server) getClipboard(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, item)
 }
 
+func (s *Server) refreshClipboardCode(w http.ResponseWriter, r *http.Request) {
+	if !sameOrigin(r) {
+		writeError(w, http.StatusForbidden, "cross-origin request rejected")
+		return
+	}
+	user := s.auth.User(r)
+	if user == nil {
+		writeError(w, http.StatusUnauthorized, "sign in to manage this clipboard")
+		return
+	}
+
+	code := normalizeCode(r.PathValue("code"))
+	for attempt := 0; attempt < 8; attempt++ {
+		newCode, err := generateCode(6)
+		if err != nil {
+			s.internalError(w, err)
+			return
+		}
+		if newCode == code {
+			continue
+		}
+		item, err := s.store.RefreshCode(r.Context(), code, newCode, user.Subject)
+		if err == nil {
+			writeJSON(w, http.StatusOK, item)
+			return
+		}
+		if isUniqueViolation(err) {
+			continue
+		}
+		s.storeError(w, err)
+		return
+	}
+	s.internalError(w, errors.New("could not allocate unique clipboard code"))
+}
+
 type createRequest struct {
 	Content   string     `json:"content"`
 	IsPublic  bool       `json:"is_public"`
@@ -170,8 +215,7 @@ func (s *Server) createClipboard(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusCreated, item)
 			return
 		}
-		var postgresError *pgconn.PgError
-		if !errors.As(err, &postgresError) || postgresError.Code != "23505" {
+		if !isUniqueViolation(err) {
 			s.internalError(w, err)
 			return
 		}
@@ -256,11 +300,14 @@ func (s *Server) storeError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, store.ErrNotFound):
 		writeError(w, http.StatusNotFound, "clipboard not found")
-	case errors.Is(err, store.ErrForbidden):
-		writeError(w, http.StatusForbidden, "clipboard is private")
 	default:
 		s.internalError(w, err)
 	}
+}
+
+func isUniqueViolation(err error) bool {
+	var postgresError *pgconn.PgError
+	return errors.As(err, &postgresError) && postgresError.Code == "23505"
 }
 
 func (s *Server) internalError(w http.ResponseWriter, err error) {

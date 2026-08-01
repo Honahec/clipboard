@@ -79,8 +79,8 @@ export default function App() {
               onDeleted={(code) => {
                 if (pinned?.code === code) setPinned(undefined)
               }}
-              onUpdated={(clipboard) => {
-                if (pinned?.code === clipboard.code) setPinned(clipboard)
+              onUpdated={(clipboard, previousCode = clipboard.code) => {
+                if (pinned?.code === previousCode) setPinned(clipboard)
               }}
             />
           </TabsContent>
@@ -102,8 +102,8 @@ export default function App() {
                 onDeleted={(code) => {
                   if (pinned?.code === code) setPinned(undefined)
                 }}
-                onUpdated={(clipboard) => {
-                  if (pinned?.code === clipboard.code) setPinned(clipboard)
+                onUpdated={(clipboard, previousCode = clipboard.code) => {
+                  if (pinned?.code === previousCode) setPinned(clipboard)
                 }}
               />
             </TabsContent>

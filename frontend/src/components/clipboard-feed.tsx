@@ -78,7 +78,7 @@ export function ClipboardFeed({
   lookup: ReactNode
   onPinnedDismissed: () => void
   onDeleted: (code: string) => void
-  onUpdated: (clipboard: Clipboard) => void
+  onUpdated: (clipboard: Clipboard, previousCode?: string) => void
 }) {
   const { locale, t } = useI18n()
   const [selected, setSelected] = useState<Clipboard>()
@@ -99,9 +99,13 @@ export function ClipboardFeed({
     return mode === "mine" ? combined.filter((item) => item.owned_by_me) : combined
   }, [mode, pinned, query.data])
 
-  function handleUpdated(clipboard: Clipboard) {
-    if (selected?.code === clipboard.code) setSelected(clipboard)
-    onUpdated(clipboard)
+  function handleUpdated(clipboard: Clipboard, previousCode = clipboard.code) {
+    if (selected?.code === previousCode) setSelected(clipboard)
+    const urlCode = new URLSearchParams(window.location.search).get("code")
+    if (urlCode?.toUpperCase() === previousCode) {
+      window.history.replaceState(null, "", `/?code=${clipboard.code}`)
+    }
+    onUpdated(clipboard, previousCode)
   }
 
   function handleDeleted(code: string) {
