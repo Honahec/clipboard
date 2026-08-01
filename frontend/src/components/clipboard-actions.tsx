@@ -4,6 +4,7 @@ import {
   GlobeIcon,
   LinkIcon,
   LockIcon,
+  RefreshCwIcon,
   Trash2Icon,
 } from "lucide-react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -67,7 +68,7 @@ export function ClipboardActions({
   clipboard: Clipboard
   onOpen: () => void
   onDeleted: (code: string) => void
-  onUpdated: (clipboard: Clipboard) => void
+  onUpdated: (clipboard: Clipboard, previousCode?: string) => void
 }) {
   const { t } = useI18n()
   const queryClient = useQueryClient()
@@ -86,6 +87,15 @@ export function ClipboardActions({
       onDeleted(clipboard.code)
       await queryClient.invalidateQueries({ queryKey: ["clipboards"] })
       toast.success(t("actions.deleted"))
+    },
+    onError: (error) => toast.error(errorMessage(error, t("errors.requestFailed"))),
+  })
+  const refreshCode = useMutation({
+    mutationFn: () => api.refreshCode(clipboard.code),
+    onSuccess: async (updated) => {
+      onUpdated(updated, clipboard.code)
+      await queryClient.invalidateQueries({ queryKey: ["clipboards"] })
+      toast.success(t("actions.codeRefreshed", { code: updated.code }))
     },
     onError: (error) => toast.error(errorMessage(error, t("errors.requestFailed"))),
   })
@@ -120,7 +130,7 @@ export function ClipboardActions({
           <IconAction
             label={clipboard.is_public ? t("actions.makePrivate") : t("actions.makePublic")}
             onClick={() => visibility.mutate()}
-            disabled={visibility.isPending || remove.isPending}
+            disabled={visibility.isPending || refreshCode.isPending || remove.isPending}
           >
             {visibility.isPending ? (
               <Spinner />
@@ -130,6 +140,43 @@ export function ClipboardActions({
               <GlobeIcon />
             )}
           </IconAction>
+
+          {!clipboard.is_public ? (
+            <AlertDialog>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={t("actions.refreshCode")}
+                      disabled={refreshCode.isPending || remove.isPending}
+                    >
+                      {refreshCode.isPending ? <Spinner /> : <RefreshCwIcon />}
+                    </Button>
+                  </AlertDialogTrigger>
+                </TooltipTrigger>
+                <TooltipContent>{t("actions.refreshCode")}</TooltipContent>
+              </Tooltip>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {t("actions.refreshCodeTitle", { code: clipboard.code })}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t("actions.refreshCodeDescription")}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t("actions.cancel")}</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => refreshCode.mutate()}>
+                    {t("actions.refreshCode")}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : null}
 
           <AlertDialog>
             <Tooltip>

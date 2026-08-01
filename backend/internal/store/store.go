@@ -11,7 +11,6 @@ import (
 )
 
 var ErrNotFound = errors.New("clipboard not found")
-var ErrForbidden = errors.New("clipboard access forbidden")
 
 type Clipboard struct {
 	Code      string     `json:"code"`
@@ -36,6 +35,7 @@ type Repository interface {
 	List(context.Context, string, int) ([]Clipboard, error)
 	Create(context.Context, CreateClipboard) (Clipboard, error)
 	Get(context.Context, string, string) (Clipboard, error)
+	RefreshCode(context.Context, string, string, string) (Clipboard, error)
 	SetVisibility(context.Context, string, string, bool) (Clipboard, error)
 	Delete(context.Context, string, string) error
 	Ping(context.Context) error
@@ -120,17 +120,21 @@ func (p *Postgres) Create(ctx context.Context, input CreateClipboard) (Clipboard
 }
 
 func (p *Postgres) Get(ctx context.Context, code, subject string) (Clipboard, error) {
-	item, err := scanClipboard(p.pool.QueryRow(ctx, `
+	return scanClipboard(p.pool.QueryRow(ctx, `
 		SELECT `+selectColumns+`
 		FROM clipboards
 		WHERE code = $1 AND (expires_at IS NULL OR expires_at > now())`, code), subject)
-	if err != nil {
-		return Clipboard{}, err
-	}
-	if !item.IsPublic && !item.OwnedByMe {
-		return Clipboard{}, ErrForbidden
-	}
-	return item, nil
+}
+
+func (p *Postgres) RefreshCode(ctx context.Context, code, newCode, subject string) (Clipboard, error) {
+	return scanClipboard(p.pool.QueryRow(ctx, `
+		UPDATE clipboards
+		SET code = $2, updated_at = now()
+		WHERE code = $1
+		  AND owner_subject = $3
+		  AND is_public = false
+		  AND (expires_at IS NULL OR expires_at > now())
+		RETURNING `+selectColumns, code, newCode, subject), subject)
 }
 
 func (p *Postgres) SetVisibility(ctx context.Context, code, subject string, public bool) (Clipboard, error) {

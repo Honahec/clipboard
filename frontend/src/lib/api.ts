@@ -49,6 +49,11 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ is_public: isPublic }),
     }),
+  refreshCode: (code: string) =>
+    request<Clipboard>(
+      `/api/clipboards/${encodeURIComponent(code)}/refresh-code`,
+      { method: "POST" },
+    ),
   deleteClipboard: (code: string) =>
     request<void>(`/api/clipboards/${encodeURIComponent(code)}`, {
       method: "DELETE",
