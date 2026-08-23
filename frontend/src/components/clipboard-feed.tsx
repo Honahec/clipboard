@@ -5,7 +5,7 @@ import {
   SearchIcon,
   TriangleAlertIcon,
 } from "lucide-react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { ClipboardActions } from "@/components/clipboard-actions"
 import { ClipboardDetailDialog } from "@/components/clipboard-detail-dialog"
@@ -101,6 +101,7 @@ export function ClipboardFeed({
   onUpdated: (clipboard: Clipboard, previousCode?: string) => void
 }) {
   const { locale, t } = useI18n()
+  const queryClient = useQueryClient()
   const [selected, setSelected] = useState<Clipboard>()
   const [search, setSearch] = useState("")
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("all")
@@ -138,12 +139,21 @@ export function ClipboardFeed({
   }, [items, search, visibilityFilter])
 
   function handleUpdated(clipboard: Clipboard, previousCode = clipboard.code) {
-    if (selected?.code === previousCode) setSelected(clipboard)
+    queryClient.setQueriesData<Clipboard[]>(
+      { queryKey: ["clipboards"] },
+      (current) => current?.map((item) =>
+        item.code === previousCode ? clipboard : item,
+      ),
+    )
+    setSelected((current) =>
+      current?.code === previousCode ? clipboard : current,
+    )
     const urlCode = new URLSearchParams(window.location.search).get("code")
     if (urlCode?.toUpperCase() === previousCode) {
       window.history.replaceState(null, "", `/?code=${clipboard.code}`)
     }
     onUpdated(clipboard, previousCode)
+    void queryClient.invalidateQueries({ queryKey: ["clipboards"] })
   }
 
   function handleDeleted(code: string) {
@@ -353,6 +363,7 @@ export function ClipboardFeed({
       <ClipboardDetailDialog
         clipboard={selected}
         open={Boolean(selected)}
+        onUpdated={handleUpdated}
         onOpenChange={(open) => {
           if (!open) {
             setSelected(undefined)

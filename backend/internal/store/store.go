@@ -37,6 +37,7 @@ type Repository interface {
 	Get(context.Context, string, string) (Clipboard, error)
 	RefreshCode(context.Context, string, string, string) (Clipboard, error)
 	SetVisibility(context.Context, string, string, bool) (Clipboard, error)
+	UpdateContent(context.Context, string, string, string) (Clipboard, error)
 	Delete(context.Context, string, string) error
 	Ping(context.Context) error
 }
@@ -144,6 +145,14 @@ func (p *Postgres) SetVisibility(ctx context.Context, code, subject string, publ
 		WHERE code = $1 AND owner_subject = $2 AND (expires_at IS NULL OR expires_at > now())
 		RETURNING `+selectColumns, code, subject, public), subject)
 	return item, err
+}
+
+func (p *Postgres) UpdateContent(ctx context.Context, code, subject, content string) (Clipboard, error) {
+	return scanClipboard(p.pool.QueryRow(ctx, `
+		UPDATE clipboards
+		SET content = $3, updated_at = now()
+		WHERE code = $1 AND owner_subject = $2 AND (expires_at IS NULL OR expires_at > now())
+		RETURNING `+selectColumns, code, subject, content), subject)
 }
 
 func (p *Postgres) Delete(ctx context.Context, code, subject string) error {

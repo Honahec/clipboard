@@ -224,7 +224,8 @@ func (s *Server) createClipboard(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateRequest struct {
-	IsPublic *bool `json:"is_public"`
+	Content  *string `json:"content"`
+	IsPublic *bool   `json:"is_public"`
 }
 
 func (s *Server) updateClipboard(w http.ResponseWriter, r *http.Request) {
@@ -238,14 +239,35 @@ func (s *Server) updateClipboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input updateRequest
-	if err := decodeJSON(r, &input); err != nil || input.IsPublic == nil {
-		writeError(w, http.StatusBadRequest, "is_public is required")
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	item, err := s.store.SetVisibility(r.Context(), normalizeCode(r.PathValue("code")), user.Subject, *input.IsPublic)
-	if err != nil {
-		s.storeError(w, err)
+	if input.Content == nil && input.IsPublic == nil {
+		writeError(w, http.StatusBadRequest, "content or is_public is required")
 		return
+	}
+	if input.Content != nil && (strings.TrimSpace(*input.Content) == "" || len([]rune(*input.Content)) > maxContentLength) {
+		writeError(w, http.StatusBadRequest, "content must contain between 1 and 100000 characters")
+		return
+	}
+
+	code := normalizeCode(r.PathValue("code"))
+	var item store.Clipboard
+	var err error
+	if input.Content != nil {
+		item, err = s.store.UpdateContent(r.Context(), code, user.Subject, *input.Content)
+		if err != nil {
+			s.storeError(w, err)
+			return
+		}
+	}
+	if input.IsPublic != nil {
+		item, err = s.store.SetVisibility(r.Context(), code, user.Subject, *input.IsPublic)
+		if err != nil {
+			s.storeError(w, err)
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, item)
 }

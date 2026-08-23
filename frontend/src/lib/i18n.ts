@@ -81,6 +81,16 @@ const english = {
   "actions.deleteTitle": "Delete {code}?",
   "actions.deleteDescription": "The share code and link will stop working immediately.",
   "actions.cancel": "Cancel",
+  "actions.editContent": "Edit content",
+  "actions.save": "Save",
+  "actions.saving": "Saving",
+  "detail.contentLabel": "Clipboard content",
+  "detail.contentPlaceholder": "Type or paste content",
+  "detail.contentRequired": "Content cannot be blank.",
+  "detail.contentTooLong": "Content must not exceed {max} characters.",
+  "detail.characterCount": "{count} / {max} characters",
+  "detail.updateSucceeded": "Clipboard updated",
+  "detail.updateFailed": "Could not update clipboard",
   "detail.expires": "Expires {date}",
 } as const
 
@@ -167,6 +177,16 @@ const chinese: Record<TranslationKey, string> = {
   "actions.deleteTitle": "删除 {code}？",
   "actions.deleteDescription": "删除后，分享代码和链接将立即失效。",
   "actions.cancel": "取消",
+  "actions.editContent": "编辑内容",
+  "actions.save": "保存",
+  "actions.saving": "保存中",
+  "detail.contentLabel": "剪贴板内容",
+  "detail.contentPlaceholder": "输入或粘贴内容",
+  "detail.contentRequired": "内容不能为空。",
+  "detail.contentTooLong": "内容不能超过 {max} 个字符。",
+  "detail.characterCount": "{count} / {max} 个字符",
+  "detail.updateSucceeded": "剪贴板已更新",
+  "detail.updateFailed": "无法更新剪贴板",
   "detail.expires": "到期 {date}",
 }
 

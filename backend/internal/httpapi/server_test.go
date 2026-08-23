@@ -16,11 +16,16 @@ import (
 )
 
 type fakeStore struct {
-	created      *store.CreateClipboard
-	getItem      store.Clipboard
-	getError     error
-	refreshInput [3]string
-	refreshError error
+	created          *store.CreateClipboard
+	getItem          store.Clipboard
+	getError         error
+	refreshInput     [3]string
+	refreshError     error
+	updateItem       store.Clipboard
+	updateError      error
+	contentInput     [3]string
+	visibilityInput  [2]string
+	visibilityPublic bool
 }
 
 func (f *fakeStore) List(context.Context, string, int) ([]store.Clipboard, error) {
@@ -45,8 +50,28 @@ func (f *fakeStore) RefreshCode(_ context.Context, code, newCode, subject string
 		OwnedByMe: true,
 	}, nil
 }
-func (f *fakeStore) SetVisibility(context.Context, string, string, bool) (store.Clipboard, error) {
-	return store.Clipboard{}, store.ErrNotFound
+func (f *fakeStore) SetVisibility(_ context.Context, code, subject string, public bool) (store.Clipboard, error) {
+	f.visibilityInput = [2]string{code, subject}
+	f.visibilityPublic = public
+	if f.updateError != nil {
+		return store.Clipboard{}, f.updateError
+	}
+	if f.updateItem.Code == "" {
+		return store.Clipboard{}, store.ErrNotFound
+	}
+	f.updateItem.IsPublic = public
+	return f.updateItem, nil
+}
+func (f *fakeStore) UpdateContent(_ context.Context, code, subject, content string) (store.Clipboard, error) {
+	f.contentInput = [3]string{code, subject, content}
+	if f.updateError != nil {
+		return store.Clipboard{}, f.updateError
+	}
+	if f.updateItem.Code == "" {
+		return store.Clipboard{}, store.ErrNotFound
+	}
+	f.updateItem.Content = content
+	return f.updateItem, nil
 }
 func (f *fakeStore) Delete(context.Context, string, string) error { return store.ErrNotFound }
 func (f *fakeStore) Ping(context.Context) error                   { return nil }
@@ -166,6 +191,143 @@ func TestOwnerCanRefreshPrivateClipboardCode(t *testing.T) {
 	}
 	if len(repository.refreshInput[1]) != 6 || repository.refreshInput[1] == "ABC234" {
 		t.Fatalf("new code = %q, want a different six-character code", repository.refreshInput[1])
+	}
+}
+
+func TestUpdateClipboardRequiresSignIn(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPatch, "/api/clipboards/ABC234", strings.NewReader(`{"content":"updated"}`))
+	response := httptest.NewRecorder()
+
+	newTestServer(&fakeStore{}).ServeHTTP(response, request)
+
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusUnauthorized, response.Body.String())
+	}
+}
+
+func TestUpdateClipboardRejectsInvalidContent(t *testing.T) {
+	overlong, err := json.Marshal(map[string]string{"content": strings.Repeat("界", maxContentLength+1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "empty object", body: `{}`},
+		{name: "empty content", body: `{"content":""}`},
+		{name: "blank content", body: `{"content":" \n\t "}`},
+		{name: "overlong content", body: string(overlong)},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repository := &fakeStore{}
+			request := httptest.NewRequest(http.MethodPatch, "/api/clipboards/ABC234", strings.NewReader(test.body))
+			response := httptest.NewRecorder()
+
+			newAuthenticatedTestServer(repository, auth.User{Subject: "user-1"}).ServeHTTP(response, request)
+
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusBadRequest, response.Body.String())
+			}
+			if repository.contentInput != [3]string{} || repository.visibilityInput != [2]string{} {
+				t.Fatalf("invalid update reached repository: content=%#v visibility=%#v", repository.contentInput, repository.visibilityInput)
+			}
+		})
+	}
+}
+
+func TestNonOwnerCannotUpdateClipboardContent(t *testing.T) {
+	repository := &fakeStore{updateError: store.ErrNotFound}
+	request := httptest.NewRequest(http.MethodPatch, "/api/clipboards/ABC234", strings.NewReader(`{"content":"updated"}`))
+	response := httptest.NewRecorder()
+
+	newAuthenticatedTestServer(repository, auth.User{Subject: "other-user"}).ServeHTTP(response, request)
+
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusNotFound, response.Body.String())
+	}
+	if repository.contentInput != [3]string{"ABC234", "other-user", "updated"} {
+		t.Fatalf("unexpected content update input: %#v", repository.contentInput)
+	}
+}
+
+func TestOwnerCanUpdateClipboardContent(t *testing.T) {
+	createdAt := time.Date(2026, time.August, 24, 10, 0, 0, 0, time.UTC)
+	previousUpdatedAt := createdAt.Add(time.Minute)
+	updatedAt := previousUpdatedAt.Add(time.Minute)
+	expiresAt := createdAt.Add(time.Hour)
+	repository := &fakeStore{updateItem: store.Clipboard{
+		Code: "ABC234", Content: "old content", IsPublic: false, ExpiresAt: &expiresAt,
+		CreatedAt: createdAt, UpdatedAt: updatedAt, OwnedByMe: true,
+	}}
+	const content = "  updated\ncontent  "
+	payload, err := json.Marshal(map[string]string{"content": content})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPatch, "/api/clipboards/abc234", strings.NewReader(string(payload)))
+	response := httptest.NewRecorder()
+
+	newAuthenticatedTestServer(repository, auth.User{Subject: "user-1"}).ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusOK, response.Body.String())
+	}
+	if repository.contentInput != [3]string{"ABC234", "user-1", content} {
+		t.Fatalf("unexpected content update input: %#v", repository.contentInput)
+	}
+	var item store.Clipboard
+	if err := json.Unmarshal(response.Body.Bytes(), &item); err != nil {
+		t.Fatal(err)
+	}
+	if item.Code != "ABC234" || item.Content != content || item.IsPublic || item.ExpiresAt == nil || !item.ExpiresAt.Equal(expiresAt) || !item.CreatedAt.Equal(createdAt) || !item.UpdatedAt.Equal(updatedAt) || !item.UpdatedAt.After(previousUpdatedAt) || !item.OwnedByMe {
+		t.Fatalf("unexpected clipboard: %#v", item)
+	}
+}
+
+func TestOwnerCanUpdateClipboardVisibilityOnly(t *testing.T) {
+	repository := &fakeStore{updateItem: store.Clipboard{Code: "ABC234", Content: "keep me", IsPublic: true, OwnedByMe: true}}
+	request := httptest.NewRequest(http.MethodPatch, "/api/clipboards/ABC234", strings.NewReader(`{"is_public":false}`))
+	response := httptest.NewRecorder()
+
+	newAuthenticatedTestServer(repository, auth.User{Subject: "user-1"}).ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusOK, response.Body.String())
+	}
+	if repository.visibilityInput != [2]string{"ABC234", "user-1"} || repository.visibilityPublic || repository.contentInput != [3]string{} {
+		t.Fatalf("unexpected repository inputs: visibility=%#v public=%t content=%#v", repository.visibilityInput, repository.visibilityPublic, repository.contentInput)
+	}
+	var item store.Clipboard
+	if err := json.Unmarshal(response.Body.Bytes(), &item); err != nil {
+		t.Fatal(err)
+	}
+	if item.Content != "keep me" || item.IsPublic {
+		t.Fatalf("unexpected clipboard: %#v", item)
+	}
+}
+
+func TestOwnerCanUpdateContentAndVisibility(t *testing.T) {
+	repository := &fakeStore{updateItem: store.Clipboard{Code: "ABC234", Content: "old", IsPublic: false, OwnedByMe: true}}
+	request := httptest.NewRequest(http.MethodPatch, "/api/clipboards/ABC234", strings.NewReader(`{"content":"new","is_public":true}`))
+	response := httptest.NewRecorder()
+
+	newAuthenticatedTestServer(repository, auth.User{Subject: "user-1"}).ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusOK, response.Body.String())
+	}
+	if repository.contentInput != [3]string{"ABC234", "user-1", "new"} || repository.visibilityInput != [2]string{"ABC234", "user-1"} || !repository.visibilityPublic {
+		t.Fatalf("unexpected repository inputs: content=%#v visibility=%#v public=%t", repository.contentInput, repository.visibilityInput, repository.visibilityPublic)
+	}
+	var item store.Clipboard
+	if err := json.Unmarshal(response.Body.Bytes(), &item); err != nil {
+		t.Fatal(err)
+	}
+	if item.Content != "new" || !item.IsPublic || !item.OwnedByMe {
+		t.Fatalf("unexpected clipboard: %#v", item)
 	}
 }
 
