@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
-import { ClipboardIcon, RefreshCwIcon, TriangleAlertIcon } from "lucide-react"
+import {
+  ClipboardIcon,
+  RefreshCwIcon,
+  SearchIcon,
+  TriangleAlertIcon,
+} from "lucide-react"
 import { useQuery } from "@tanstack/react-query"
 
 import { ClipboardActions } from "@/components/clipboard-actions"
@@ -21,6 +26,19 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
@@ -39,6 +57,8 @@ import type { Clipboard, Session } from "@/lib/types"
 function preview(content: string) {
   return content.replace(/\s+/g, " ").trim()
 }
+
+type VisibilityFilter = "all" | "public" | "private"
 
 function VisibilityBadge({ clipboard }: { clipboard: Clipboard }) {
   const { t } = useI18n()
@@ -82,6 +102,8 @@ export function ClipboardFeed({
 }) {
   const { locale, t } = useI18n()
   const [selected, setSelected] = useState<Clipboard>()
+  const [search, setSearch] = useState("")
+  const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>("all")
   const query = useQuery({
     queryKey: ["clipboards", session?.authenticated],
     queryFn: api.listClipboards,
@@ -98,6 +120,22 @@ export function ClipboardFeed({
       : values
     return mode === "mine" ? combined.filter((item) => item.owned_by_me) : combined
   }, [mode, pinned, query.data])
+
+  const filteredItems = useMemo(() => {
+    const normalizedSearch = search.trim().toLocaleLowerCase()
+
+    return items.filter((item) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        item.code.toLocaleLowerCase().includes(normalizedSearch) ||
+        item.content.toLocaleLowerCase().includes(normalizedSearch)
+      const matchesVisibility =
+        visibilityFilter === "all" ||
+        (visibilityFilter === "public" ? item.is_public : !item.is_public)
+
+      return matchesSearch && matchesVisibility
+    })
+  }, [items, search, visibilityFilter])
 
   function handleUpdated(clipboard: Clipboard, previousCode = clipboard.code) {
     if (selected?.code === previousCode) setSelected(clipboard)
@@ -120,31 +158,65 @@ export function ClipboardFeed({
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>
-          {items.length === 1
+          {filteredItems.length === 1
             ? t("feed.record")
-            : t("feed.records", { count: items.length })}
+            : t("feed.records", { count: filteredItems.length })}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <div className="flex items-center justify-end gap-2">
-          {lookup}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                aria-label={t("feed.refresh")}
-                onClick={() => void query.refetch()}
-                disabled={query.isFetching}
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+            <InputGroup className="w-full sm:w-64">
+              <InputGroupAddon>
+                <SearchIcon />
+              </InputGroupAddon>
+              <InputGroupInput
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={t("feed.searchPlaceholder")}
+                aria-label={t("feed.searchLabel")}
+              />
+            </InputGroup>
+            <Select
+              value={visibilityFilter}
+              onValueChange={(value) => setVisibilityFilter(value as VisibilityFilter)}
+            >
+              <SelectTrigger
+                className="w-full sm:w-36"
+                aria-label={t("feed.visibilityFilterLabel")}
               >
-                <RefreshCwIcon
-                  className={query.isFetching ? "animate-spin" : undefined}
-                />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{t("feed.refresh")}</TooltipContent>
-          </Tooltip>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="all">{t("feed.visibilityAll")}</SelectItem>
+                  <SelectItem value="public">{t("feed.public")}</SelectItem>
+                  <SelectItem value="private">{t("feed.private")}</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex min-w-0 items-center justify-end gap-2 lg:ml-auto">
+            {lookup}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={t("feed.refresh")}
+                  onClick={() => void query.refetch()}
+                  disabled={query.isFetching}
+                >
+                  <RefreshCwIcon
+                    className={query.isFetching ? "animate-spin" : undefined}
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("feed.refresh")}</TooltipContent>
+            </Tooltip>
+          </div>
         </div>
 
         {query.isPending ? <LoadingFeed /> : null}
@@ -168,7 +240,18 @@ export function ClipboardFeed({
             </EmptyHeader>
           </Empty>
         ) : null}
-        {query.isSuccess && items.length > 0 ? (
+        {query.isSuccess && items.length > 0 && filteredItems.length === 0 ? (
+          <Empty className="min-h-56">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <SearchIcon />
+              </EmptyMedia>
+              <EmptyTitle>{t("feed.noResultsTitle")}</EmptyTitle>
+              <EmptyDescription>{t("feed.noResultsDescription")}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : null}
+        {query.isSuccess && filteredItems.length > 0 ? (
           <>
             <div className="hidden overflow-hidden rounded-md border md:block">
               <Table>
@@ -183,7 +266,7 @@ export function ClipboardFeed({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {items.map((clipboard) => (
+                  {filteredItems.map((clipboard) => (
                     <TableRow key={clipboard.code}>
                       <TableCell className="font-mono font-medium">
                         {clipboard.code}
@@ -221,7 +304,7 @@ export function ClipboardFeed({
             </div>
 
             <div className="divide-y rounded-md border md:hidden">
-              {items.map((clipboard) => (
+              {filteredItems.map((clipboard) => (
                 <div key={clipboard.code} className="flex flex-col gap-2.5 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <button
