@@ -60,6 +60,7 @@ export function ComposeForm({
   const [content, setContent] = useState("")
   const [expiry, setExpiry] = useState<Expiry>("24h")
   const [isPrivate, setIsPrivate] = useState(false)
+  const [burnAfterRead, setBurnAfterRead] = useState(false)
   const signedIn = Boolean(session?.authenticated)
 
   const create = useMutation({
@@ -67,6 +68,7 @@ export function ComposeForm({
     onSuccess: async (clipboard) => {
       setContent("")
       setIsPrivate(false)
+      setBurnAfterRead(false)
       onCreated(clipboard)
       await queryClient.invalidateQueries({ queryKey: ["clipboards"] })
       toast.success(t("compose.created"), {
@@ -89,6 +91,7 @@ export function ComposeForm({
     create.mutate({
       content: content.trim(),
       is_public: signedIn ? !isPrivate : true,
+      burn_after_read: burnAfterRead,
       expires_at: expirationFor(signedIn ? expiry : expiry === "never" ? "24h" : expiry),
     })
   }
@@ -159,6 +162,23 @@ export function ComposeForm({
                 />
               </Field>
             </div>
+
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldTitle id="burn-after-read-title">
+                  {t("compose.burnAfterReadTitle")}
+                </FieldTitle>
+                <FieldDescription id="burn-after-read-description">
+                  {t("compose.burnAfterReadDescription")}
+                </FieldDescription>
+              </FieldContent>
+              <Switch
+                aria-labelledby="burn-after-read-title"
+                aria-describedby="burn-after-read-description"
+                checked={burnAfterRead}
+                onCheckedChange={setBurnAfterRead}
+              />
+            </Field>
 
             <div className="flex justify-end">
               <Button type="submit" disabled={!valid || create.isPending}>

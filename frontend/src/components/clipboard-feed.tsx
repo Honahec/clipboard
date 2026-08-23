@@ -116,20 +116,20 @@ export function ClipboardFeed({
 
   const items = useMemo(() => {
     const values = query.data ?? []
-    const combined = pinned && !values.some((item) => item.code === pinned.code)
+    const combined = pinned && !pinned.burn_after_read && !values.some((item) => item.code === pinned.code)
       ? [pinned, ...values]
       : values
     return mode === "mine" ? combined.filter((item) => item.owned_by_me) : combined
   }, [mode, pinned, query.data])
 
   const filteredItems = useMemo(() => {
-    const normalizedSearch = search.trim().toLocaleLowerCase()
+    const normalizedSearch = search.trim().toLowerCase()
 
     return items.filter((item) => {
       const matchesSearch =
         !normalizedSearch ||
-        item.code.toLocaleLowerCase().includes(normalizedSearch) ||
-        item.content.toLocaleLowerCase().includes(normalizedSearch)
+        item.code.toLowerCase().includes(normalizedSearch) ||
+        item.content.toLowerCase().includes(normalizedSearch)
       const matchesVisibility =
         visibilityFilter === "all" ||
         (visibilityFilter === "public" ? item.is_public : !item.is_public)

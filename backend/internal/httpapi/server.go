@@ -164,9 +164,10 @@ func (s *Server) refreshClipboardCode(w http.ResponseWriter, r *http.Request) {
 }
 
 type createRequest struct {
-	Content   string     `json:"content"`
-	IsPublic  bool       `json:"is_public"`
-	ExpiresAt *time.Time `json:"expires_at"`
+	Content       string     `json:"content"`
+	IsPublic      bool       `json:"is_public"`
+	BurnAfterRead bool       `json:"burn_after_read"`
+	ExpiresAt     *time.Time `json:"expires_at"`
 }
 
 func (s *Server) createClipboard(w http.ResponseWriter, r *http.Request) {
@@ -210,7 +211,7 @@ func (s *Server) createClipboard(w http.ResponseWriter, r *http.Request) {
 			s.internalError(w, err)
 			return
 		}
-		item, err := s.store.Create(r.Context(), store.CreateClipboard{Code: code, Content: input.Content, OwnerID: ownerID, IsPublic: input.IsPublic, ExpiresAt: input.ExpiresAt})
+		item, err := s.store.Create(r.Context(), store.CreateClipboard{Code: code, Content: input.Content, OwnerID: ownerID, IsPublic: input.IsPublic, BurnAfterRead: input.BurnAfterRead, ExpiresAt: input.ExpiresAt})
 		if err == nil {
 			writeJSON(w, http.StatusCreated, item)
 			return
@@ -252,22 +253,13 @@ func (s *Server) updateClipboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	code := normalizeCode(r.PathValue("code"))
-	var item store.Clipboard
-	var err error
-	if input.Content != nil {
-		item, err = s.store.UpdateContent(r.Context(), code, user.Subject, *input.Content)
-		if err != nil {
-			s.storeError(w, err)
-			return
-		}
-	}
-	if input.IsPublic != nil {
-		item, err = s.store.SetVisibility(r.Context(), code, user.Subject, *input.IsPublic)
-		if err != nil {
-			s.storeError(w, err)
-			return
-		}
+	item, err := s.store.Update(r.Context(), normalizeCode(r.PathValue("code")), user.Subject, store.UpdateClipboard{
+		Content:  input.Content,
+		IsPublic: input.IsPublic,
+	})
+	if err != nil {
+		s.storeError(w, err)
+		return
 	}
 	writeJSON(w, http.StatusOK, item)
 }

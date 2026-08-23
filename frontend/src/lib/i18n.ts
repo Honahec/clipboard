@@ -33,6 +33,8 @@ const english = {
   "compose.privateTitle": "Private",
   "compose.privateDescription": "Only listed for your account",
   "compose.privateRequiresLogin": "Available after sign-in",
+  "compose.burnAfterReadTitle": "Burn after reading",
+  "compose.burnAfterReadDescription": "This clipboard will not appear in lists and will be deleted the first time its share code or link is opened.",
   "compose.creating": "Creating",
   "compose.create": "Create",
   "lookup.found": "Found {code}",
@@ -92,6 +94,7 @@ const english = {
   "detail.updateSucceeded": "Clipboard updated",
   "detail.updateFailed": "Could not update clipboard",
   "detail.expires": "Expires {date}",
+  "detail.burnAfterRead": "Burn after reading",
 } as const
 
 type TranslationKey = keyof typeof english
@@ -129,6 +132,8 @@ const chinese: Record<TranslationKey, string> = {
   "compose.privateTitle": "仅自己可见",
   "compose.privateDescription": "仅在你的账户列表中显示",
   "compose.privateRequiresLogin": "登录后可用",
+  "compose.burnAfterReadTitle": "阅后即焚",
+  "compose.burnAfterReadDescription": "该剪贴板不会进入列表，并会在首次通过分享码或链接打开时删除。",
   "compose.creating": "正在创建",
   "compose.create": "创建",
   "lookup.found": "已找到 {code}",
@@ -188,6 +193,7 @@ const chinese: Record<TranslationKey, string> = {
   "detail.updateSucceeded": "剪贴板已更新",
   "detail.updateFailed": "无法更新剪贴板",
   "detail.expires": "到期 {date}",
+  "detail.burnAfterRead": "阅后即焚",
 }
 
 export type Language = "en" | "zh-CN"

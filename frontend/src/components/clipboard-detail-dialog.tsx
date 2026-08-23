@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { ClipboardCopyIcon, CopyIcon, GlobeIcon, LockIcon, PencilIcon } from "lucide-react"
+import { ClipboardCopyIcon, CopyIcon, FlameIcon, GlobeIcon, LockIcon, PencilIcon } from "lucide-react"
 import { useMutation } from "@tanstack/react-query"
 import { toast } from "sonner"
 
@@ -52,7 +52,7 @@ export function ClipboardDetailDialog({
   useEffect(() => {
     setDraft(clipboard?.content ?? "")
     setEditing(false)
-  }, [clipboard?.code, clipboard?.content, open])
+  }, [clipboard?.code, clipboard?.content, clipboard?.consumed, open])
 
   if (!clipboard) return null
 
@@ -78,12 +78,18 @@ export function ClipboardDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <div className="flex items-center gap-2 pr-8">
+          <div className="flex flex-wrap items-center gap-2 pr-8">
             <DialogTitle className="font-mono">{clipboard.code}</DialogTitle>
             <Badge variant={clipboard.is_public ? "secondary" : "outline"}>
               {clipboard.is_public ? <GlobeIcon /> : <LockIcon />}
               {clipboard.is_public ? t("feed.public") : t("feed.private")}
             </Badge>
+            {clipboard.burn_after_read ? (
+              <Badge variant="destructive">
+                <FlameIcon />
+                {t("detail.burnAfterRead")}
+              </Badge>
+            ) : null}
           </div>
           <DialogDescription>
             {formatDate(clipboard.created_at, locale)} · {t("detail.expires", {
@@ -150,7 +156,7 @@ export function ClipboardDetailDialog({
             </>
           ) : (
             <>
-              {clipboard.owned_by_me ? (
+              {clipboard.owned_by_me && !clipboard.consumed ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -163,14 +169,16 @@ export function ClipboardDetailDialog({
                   {t("actions.editContent")}
                 </Button>
               ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={copyClipboardLink}
-              >
-                <ClipboardCopyIcon data-icon="inline-start" />
-                {t("actions.copyLink")}
-              </Button>
+              {!clipboard.consumed ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={copyClipboardLink}
+                >
+                  <ClipboardCopyIcon data-icon="inline-start" />
+                  {t("actions.copyLink")}
+                </Button>
+              ) : null}
               <Button type="button" onClick={copyClipboardContent}>
                 <CopyIcon data-icon="inline-start" />
                 {t("actions.copyContent")}

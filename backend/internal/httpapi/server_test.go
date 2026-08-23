@@ -16,16 +16,17 @@ import (
 )
 
 type fakeStore struct {
-	created          *store.CreateClipboard
-	getItem          store.Clipboard
-	getError         error
-	refreshInput     [3]string
-	refreshError     error
-	updateItem       store.Clipboard
-	updateError      error
-	contentInput     [3]string
-	visibilityInput  [2]string
-	visibilityPublic bool
+	created       *store.CreateClipboard
+	getItem       store.Clipboard
+	getError      error
+	refreshInput  [3]string
+	refreshError  error
+	updateItem    store.Clipboard
+	updateError   error
+	updateCode    string
+	updateSubject string
+	updateInput   *store.UpdateClipboard
+	updateCalls   int
 }
 
 func (f *fakeStore) List(context.Context, string, int) ([]store.Clipboard, error) {
@@ -33,7 +34,7 @@ func (f *fakeStore) List(context.Context, string, int) ([]store.Clipboard, error
 }
 func (f *fakeStore) Create(_ context.Context, input store.CreateClipboard) (store.Clipboard, error) {
 	f.created = &input
-	return store.Clipboard{Code: input.Code, Content: input.Content, IsPublic: input.IsPublic, ExpiresAt: input.ExpiresAt}, nil
+	return store.Clipboard{Code: input.Code, Content: input.Content, IsPublic: input.IsPublic, BurnAfterRead: input.BurnAfterRead, ExpiresAt: input.ExpiresAt}, nil
 }
 func (f *fakeStore) Get(context.Context, string, string) (store.Clipboard, error) {
 	return f.getItem, f.getError
@@ -50,27 +51,23 @@ func (f *fakeStore) RefreshCode(_ context.Context, code, newCode, subject string
 		OwnedByMe: true,
 	}, nil
 }
-func (f *fakeStore) SetVisibility(_ context.Context, code, subject string, public bool) (store.Clipboard, error) {
-	f.visibilityInput = [2]string{code, subject}
-	f.visibilityPublic = public
+func (f *fakeStore) Update(_ context.Context, code, subject string, input store.UpdateClipboard) (store.Clipboard, error) {
+	f.updateCode = code
+	f.updateSubject = subject
+	f.updateInput = &input
+	f.updateCalls++
 	if f.updateError != nil {
 		return store.Clipboard{}, f.updateError
 	}
 	if f.updateItem.Code == "" {
 		return store.Clipboard{}, store.ErrNotFound
 	}
-	f.updateItem.IsPublic = public
-	return f.updateItem, nil
-}
-func (f *fakeStore) UpdateContent(_ context.Context, code, subject, content string) (store.Clipboard, error) {
-	f.contentInput = [3]string{code, subject, content}
-	if f.updateError != nil {
-		return store.Clipboard{}, f.updateError
+	if input.Content != nil {
+		f.updateItem.Content = *input.Content
 	}
-	if f.updateItem.Code == "" {
-		return store.Clipboard{}, store.ErrNotFound
+	if input.IsPublic != nil {
+		f.updateItem.IsPublic = *input.IsPublic
 	}
-	f.updateItem.Content = content
 	return f.updateItem, nil
 }
 func (f *fakeStore) Delete(context.Context, string, string) error { return store.ErrNotFound }
@@ -116,7 +113,7 @@ func TestAnonymousClipboardRequiresExpiry(t *testing.T) {
 
 func TestAnonymousClipboardCanExpireWithinSevenDays(t *testing.T) {
 	repository := &fakeStore{}
-	payload, _ := json.Marshal(createRequest{Content: " hello ", IsPublic: true, ExpiresAt: pointerTime(time.Now().Add(time.Hour))})
+	payload, _ := json.Marshal(createRequest{Content: " hello ", IsPublic: true, BurnAfterRead: true, ExpiresAt: pointerTime(time.Now().Add(time.Hour))})
 	request := httptest.NewRequest(http.MethodPost, "/api/clipboards", strings.NewReader(string(payload)))
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
@@ -126,8 +123,15 @@ func TestAnonymousClipboardCanExpireWithinSevenDays(t *testing.T) {
 	if response.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusCreated, response.Body.String())
 	}
-	if repository.created == nil || repository.created.Content != "hello" || !repository.created.IsPublic {
+	if repository.created == nil || repository.created.Content != "hello" || !repository.created.IsPublic || !repository.created.BurnAfterRead {
 		t.Fatalf("unexpected create input: %#v", repository.created)
+	}
+	var item store.Clipboard
+	if err := json.Unmarshal(response.Body.Bytes(), &item); err != nil {
+		t.Fatal(err)
+	}
+	if !item.BurnAfterRead || item.Consumed || strings.Contains(response.Body.String(), `"consumed"`) {
+		t.Fatalf("unexpected burn create response: %#v body=%s", item, response.Body.String())
 	}
 }
 
@@ -160,8 +164,40 @@ func TestPrivateClipboardCanBeRetrievedByCode(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &item); err != nil {
 		t.Fatal(err)
 	}
-	if item.Content != "private content" || item.IsPublic {
-		t.Fatalf("unexpected clipboard: %#v", item)
+	if item.Content != "private content" || item.IsPublic || item.Consumed || strings.Contains(response.Body.String(), `"consumed"`) {
+		t.Fatalf("unexpected clipboard: %#v body=%s", item, response.Body.String())
+	}
+}
+
+func TestBurnClipboardGetReturnsConsumed(t *testing.T) {
+	repository := &fakeStore{getItem: store.Clipboard{
+		Code: "ABC234", Content: "burn content", BurnAfterRead: true, Consumed: true,
+	}}
+	request := httptest.NewRequest(http.MethodGet, "/api/clipboards/ABC234", nil)
+	response := httptest.NewRecorder()
+
+	newTestServer(repository).ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusOK, response.Body.String())
+	}
+	var item store.Clipboard
+	if err := json.Unmarshal(response.Body.Bytes(), &item); err != nil {
+		t.Fatal(err)
+	}
+	if !item.BurnAfterRead || !item.Consumed || !strings.Contains(response.Body.String(), `"consumed":true`) {
+		t.Fatalf("unexpected consumed clipboard: %#v body=%s", item, response.Body.String())
+	}
+}
+
+func TestConsumedClipboardReturnsNotFound(t *testing.T) {
+	request := httptest.NewRequest(http.MethodGet, "/api/clipboards/ABC234", nil)
+	response := httptest.NewRecorder()
+
+	newTestServer(&fakeStore{getError: store.ErrNotFound}).ServeHTTP(response, request)
+
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusNotFound, response.Body.String())
 	}
 }
 
@@ -231,8 +267,8 @@ func TestUpdateClipboardRejectsInvalidContent(t *testing.T) {
 			if response.Code != http.StatusBadRequest {
 				t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusBadRequest, response.Body.String())
 			}
-			if repository.contentInput != [3]string{} || repository.visibilityInput != [2]string{} {
-				t.Fatalf("invalid update reached repository: content=%#v visibility=%#v", repository.contentInput, repository.visibilityInput)
+			if repository.updateCalls != 0 || repository.updateInput != nil {
+				t.Fatalf("invalid update reached repository: calls=%d input=%#v", repository.updateCalls, repository.updateInput)
 			}
 		})
 	}
@@ -248,8 +284,8 @@ func TestNonOwnerCannotUpdateClipboardContent(t *testing.T) {
 	if response.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusNotFound, response.Body.String())
 	}
-	if repository.contentInput != [3]string{"ABC234", "other-user", "updated"} {
-		t.Fatalf("unexpected content update input: %#v", repository.contentInput)
+	if repository.updateCalls != 1 || repository.updateCode != "ABC234" || repository.updateSubject != "other-user" || repository.updateInput == nil || repository.updateInput.Content == nil || *repository.updateInput.Content != "updated" || repository.updateInput.IsPublic != nil {
+		t.Fatalf("unexpected update call: calls=%d code=%q subject=%q input=%#v", repository.updateCalls, repository.updateCode, repository.updateSubject, repository.updateInput)
 	}
 }
 
@@ -275,8 +311,8 @@ func TestOwnerCanUpdateClipboardContent(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusOK, response.Body.String())
 	}
-	if repository.contentInput != [3]string{"ABC234", "user-1", content} {
-		t.Fatalf("unexpected content update input: %#v", repository.contentInput)
+	if repository.updateCalls != 1 || repository.updateCode != "ABC234" || repository.updateSubject != "user-1" || repository.updateInput == nil || repository.updateInput.Content == nil || *repository.updateInput.Content != content || repository.updateInput.IsPublic != nil {
+		t.Fatalf("unexpected update call: calls=%d code=%q subject=%q input=%#v", repository.updateCalls, repository.updateCode, repository.updateSubject, repository.updateInput)
 	}
 	var item store.Clipboard
 	if err := json.Unmarshal(response.Body.Bytes(), &item); err != nil {
@@ -297,8 +333,8 @@ func TestOwnerCanUpdateClipboardVisibilityOnly(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusOK, response.Body.String())
 	}
-	if repository.visibilityInput != [2]string{"ABC234", "user-1"} || repository.visibilityPublic || repository.contentInput != [3]string{} {
-		t.Fatalf("unexpected repository inputs: visibility=%#v public=%t content=%#v", repository.visibilityInput, repository.visibilityPublic, repository.contentInput)
+	if repository.updateCalls != 1 || repository.updateCode != "ABC234" || repository.updateSubject != "user-1" || repository.updateInput == nil || repository.updateInput.Content != nil || repository.updateInput.IsPublic == nil || *repository.updateInput.IsPublic {
+		t.Fatalf("unexpected update call: calls=%d code=%q subject=%q input=%#v", repository.updateCalls, repository.updateCode, repository.updateSubject, repository.updateInput)
 	}
 	var item store.Clipboard
 	if err := json.Unmarshal(response.Body.Bytes(), &item); err != nil {
@@ -319,8 +355,8 @@ func TestOwnerCanUpdateContentAndVisibility(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d: %s", response.Code, http.StatusOK, response.Body.String())
 	}
-	if repository.contentInput != [3]string{"ABC234", "user-1", "new"} || repository.visibilityInput != [2]string{"ABC234", "user-1"} || !repository.visibilityPublic {
-		t.Fatalf("unexpected repository inputs: content=%#v visibility=%#v public=%t", repository.contentInput, repository.visibilityInput, repository.visibilityPublic)
+	if repository.updateCalls != 1 || repository.updateCode != "ABC234" || repository.updateSubject != "user-1" || repository.updateInput == nil || repository.updateInput.Content == nil || *repository.updateInput.Content != "new" || repository.updateInput.IsPublic == nil || !*repository.updateInput.IsPublic {
+		t.Fatalf("unexpected atomic update call: calls=%d code=%q subject=%q input=%#v", repository.updateCalls, repository.updateCode, repository.updateSubject, repository.updateInput)
 	}
 	var item store.Clipboard
 	if err := json.Unmarshal(response.Body.Bytes(), &item); err != nil {
