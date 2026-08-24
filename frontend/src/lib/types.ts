@@ -15,6 +15,8 @@ export type Clipboard = {
   code: string
   content: string
   is_public: boolean
+  burn_after_read: boolean
+  consumed?: boolean
   expires_at?: string
   created_at: string
   updated_at: string
@@ -24,5 +26,6 @@ export type Clipboard = {
 export type CreateClipboardInput = {
   content: string
   is_public: boolean
+  burn_after_read: boolean
   expires_at: string | null
 }

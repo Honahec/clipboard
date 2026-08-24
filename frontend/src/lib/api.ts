@@ -1,5 +1,10 @@
 import type { Clipboard, CreateClipboardInput, Session } from "@/lib/types"
 
+export type UpdateClipboardInput = {
+  content?: string
+  is_public?: boolean
+}
+
 export class ApiError extends Error {
   status: number
 
@@ -42,6 +47,11 @@ export const api = {
   createClipboard: (input: CreateClipboardInput) =>
     request<Clipboard>("/api/clipboards", {
       method: "POST",
+      body: JSON.stringify(input),
+    }),
+  updateClipboard: (code: string, input: UpdateClipboardInput) =>
+    request<Clipboard>(`/api/clipboards/${encodeURIComponent(code)}`, {
+      method: "PATCH",
       body: JSON.stringify(input),
     }),
   setVisibility: (code: string, isPublic: boolean) =>

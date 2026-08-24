@@ -13,22 +13,30 @@ import (
 var ErrNotFound = errors.New("clipboard not found")
 
 type Clipboard struct {
-	Code      string     `json:"code"`
-	Content   string     `json:"content"`
-	IsPublic  bool       `json:"is_public"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	OwnedByMe bool       `json:"owned_by_me"`
-	OwnerID   *string    `json:"-"`
+	Code          string     `json:"code"`
+	Content       string     `json:"content"`
+	IsPublic      bool       `json:"is_public"`
+	BurnAfterRead bool       `json:"burn_after_read"`
+	Consumed      bool       `json:"consumed,omitempty"`
+	ExpiresAt     *time.Time `json:"expires_at,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	OwnedByMe     bool       `json:"owned_by_me"`
+	OwnerID       *string    `json:"-"`
 }
 
 type CreateClipboard struct {
-	Code      string
-	Content   string
-	OwnerID   *string
-	IsPublic  bool
-	ExpiresAt *time.Time
+	Code          string
+	Content       string
+	OwnerID       *string
+	IsPublic      bool
+	BurnAfterRead bool
+	ExpiresAt     *time.Time
+}
+
+type UpdateClipboard struct {
+	Content  *string
+	IsPublic *bool
 }
 
 type Repository interface {
@@ -36,7 +44,7 @@ type Repository interface {
 	Create(context.Context, CreateClipboard) (Clipboard, error)
 	Get(context.Context, string, string) (Clipboard, error)
 	RefreshCode(context.Context, string, string, string) (Clipboard, error)
-	SetVisibility(context.Context, string, string, bool) (Clipboard, error)
+	Update(context.Context, string, string, UpdateClipboard) (Clipboard, error)
 	Delete(context.Context, string, string) error
 	Ping(context.Context) error
 }
@@ -73,11 +81,23 @@ func (p *Postgres) Close() { p.pool.Close() }
 
 func (p *Postgres) Ping(ctx context.Context) error { return p.pool.Ping(ctx) }
 
-const selectColumns = `code, content, owner_subject, is_public, expires_at, created_at, updated_at`
+const selectColumns = `code, content, owner_subject, is_public, burn_after_read, expires_at, created_at, updated_at`
 
 func scanClipboard(row pgx.Row, subject string) (Clipboard, error) {
 	var item Clipboard
-	if err := row.Scan(&item.Code, &item.Content, &item.OwnerID, &item.IsPublic, &item.ExpiresAt, &item.CreatedAt, &item.UpdatedAt); err != nil {
+	if err := row.Scan(&item.Code, &item.Content, &item.OwnerID, &item.IsPublic, &item.BurnAfterRead, &item.ExpiresAt, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Clipboard{}, ErrNotFound
+		}
+		return Clipboard{}, err
+	}
+	item.OwnedByMe = item.OwnerID != nil && subject != "" && *item.OwnerID == subject
+	return item, nil
+}
+
+func scanConsumedClipboard(row pgx.Row, subject string) (Clipboard, error) {
+	var item Clipboard
+	if err := row.Scan(&item.Code, &item.Content, &item.OwnerID, &item.IsPublic, &item.BurnAfterRead, &item.ExpiresAt, &item.CreatedAt, &item.UpdatedAt, &item.Consumed); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Clipboard{}, ErrNotFound
 		}
@@ -92,6 +112,7 @@ func (p *Postgres) List(ctx context.Context, subject string, limit int) ([]Clipb
 		SELECT `+selectColumns+`
 		FROM clipboards
 		WHERE (expires_at IS NULL OR expires_at > now())
+		  AND burn_after_read = false
 		  AND (is_public = true OR ($1 <> '' AND owner_subject = $1))
 		ORDER BY created_at DESC
 		LIMIT $2`, subject, limit)
@@ -113,17 +134,29 @@ func (p *Postgres) List(ctx context.Context, subject string, limit int) ([]Clipb
 
 func (p *Postgres) Create(ctx context.Context, input CreateClipboard) (Clipboard, error) {
 	return scanClipboard(p.pool.QueryRow(ctx, `
-		INSERT INTO clipboards (code, content, owner_subject, is_public, expires_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO clipboards (code, content, owner_subject, is_public, burn_after_read, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING `+selectColumns,
-		input.Code, input.Content, input.OwnerID, input.IsPublic, input.ExpiresAt), valueOrEmpty(input.OwnerID))
+		input.Code, input.Content, input.OwnerID, input.IsPublic, input.BurnAfterRead, input.ExpiresAt), valueOrEmpty(input.OwnerID))
 }
 
 func (p *Postgres) Get(ctx context.Context, code, subject string) (Clipboard, error) {
-	return scanClipboard(p.pool.QueryRow(ctx, `
-		SELECT `+selectColumns+`
+	return scanConsumedClipboard(p.pool.QueryRow(ctx, `
+		WITH consumed AS (
+			DELETE FROM clipboards
+			WHERE code = $1
+			  AND burn_after_read = true
+			  AND (expires_at IS NULL OR expires_at > now())
+			RETURNING `+selectColumns+`
+		)
+		SELECT `+selectColumns+`, true AS consumed FROM consumed
+		UNION ALL
+		SELECT `+selectColumns+`, false AS consumed
 		FROM clipboards
-		WHERE code = $1 AND (expires_at IS NULL OR expires_at > now())`, code), subject)
+		WHERE code = $1
+		  AND burn_after_read = false
+		  AND (expires_at IS NULL OR expires_at > now())
+		LIMIT 1`, code), subject)
 }
 
 func (p *Postgres) RefreshCode(ctx context.Context, code, newCode, subject string) (Clipboard, error) {
@@ -137,13 +170,14 @@ func (p *Postgres) RefreshCode(ctx context.Context, code, newCode, subject strin
 		RETURNING `+selectColumns, code, newCode, subject), subject)
 }
 
-func (p *Postgres) SetVisibility(ctx context.Context, code, subject string, public bool) (Clipboard, error) {
-	item, err := scanClipboard(p.pool.QueryRow(ctx, `
+func (p *Postgres) Update(ctx context.Context, code, subject string, input UpdateClipboard) (Clipboard, error) {
+	return scanClipboard(p.pool.QueryRow(ctx, `
 		UPDATE clipboards
-		SET is_public = $3, updated_at = now()
+		SET content = COALESCE($3, content),
+		    is_public = COALESCE($4, is_public),
+		    updated_at = now()
 		WHERE code = $1 AND owner_subject = $2 AND (expires_at IS NULL OR expires_at > now())
-		RETURNING `+selectColumns, code, subject, public), subject)
-	return item, err
+		RETURNING `+selectColumns, code, subject, input.Content, input.IsPublic), subject)
 }
 
 func (p *Postgres) Delete(ctx context.Context, code, subject string) error {

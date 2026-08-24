@@ -4,11 +4,15 @@ CREATE TABLE IF NOT EXISTS clipboards (
     content TEXT NOT NULL CHECK (char_length(content) BETWEEN 1 AND 100000),
     owner_subject TEXT,
     is_public BOOLEAN NOT NULL DEFAULT TRUE,
+    burn_after_read BOOLEAN NOT NULL DEFAULT FALSE,
     expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT private_clipboard_has_owner CHECK (is_public OR owner_subject IS NOT NULL)
 );
+
+ALTER TABLE clipboards
+    ADD COLUMN IF NOT EXISTS burn_after_read BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS clipboards_created_at_idx ON clipboards (created_at DESC);
 CREATE INDEX IF NOT EXISTS clipboards_owner_idx ON clipboards (owner_subject, created_at DESC) WHERE owner_subject IS NOT NULL;

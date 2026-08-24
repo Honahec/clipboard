@@ -1,11 +1,12 @@
--- Production schema reference. The Go service applies the identical idempotent
--- migration from internal/store/migration.sql during startup.
+-- Production schema reference. The Go service applies equivalent idempotent
+-- schema changes from internal/store/migration.sql during startup.
 CREATE TABLE IF NOT EXISTS clipboards (
     id BIGSERIAL PRIMARY KEY,
     code VARCHAR(8) NOT NULL UNIQUE,
     content TEXT NOT NULL CHECK (char_length(content) BETWEEN 1 AND 100000),
     owner_subject TEXT,
     is_public BOOLEAN NOT NULL DEFAULT TRUE,
+    burn_after_read BOOLEAN NOT NULL DEFAULT FALSE,
     expires_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
